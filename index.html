@@ -820,11 +820,16 @@ function openCodex(tab) {
 // Every move costs ATP (battle energy). A WRONG answer still spends the ATP
 // and ends your turn - so think before you answer!
 const MAX_ATP = 10;    // most ATP you can hold
-const START_ATP = 6;   // ATP at the start of a battle
-const ATP_REGEN = 2;   // ATP you regain at the start of each of your turns
+const START_ATP = 4;   // ATP at the start of a battle (was 6)
+const ATP_REGEN = 1;   // ATP you regain each turn (was 2). Attack costs 1, so you can always attack.
 // Balance knobs (checked by tests/balance.js): ~65% right answers wins, guessing loses.
-const ENEMY_POWER = 1.6;  // enemies hit harder, so losing turns really hurts
-const CREATURE_HP = 1.8;  // wild creatures are tougher (bosses keep their HP)
+// Damage is lowered on purpose so each fight lasts longer = more questions per fight.
+const PLAYER_POWER = 0.5;  // your Attack/Burst damage multiplier (was 1)
+const ENEMY_POWER = 0.75;  // enemy damage multiplier (was 1.6)
+const DEF_POWER = 0.3;     // how much of your armor/defense blocks each hit (was 1)
+const CREATURE_HP = 1.6;   // wild creature HP multiplier (was 1.8)
+const BOSS_HP = 0.8;       // guardian HP multiplier (was 1)
+const HEAL_POWER = 0.6;    // heals and potions multiplier (was 1)
 const ACTIONS = [
   { id: 'attack', label: 'Attack', key: 1, cost: 1, desc: 'Strike! Streaks hit harder.' },
   { id: 'special', label: 'ATP Burst', key: 2, cost: 5, desc: 'Huge hit.' },
@@ -839,7 +844,7 @@ function startBattle(opt) {
   let e;
   if (opt.boss !== undefined) {
     const b = BOSSES[opt.boss];
-    e = { name: b.name, color: b.color, shape: b.shape, hp: b.hp, maxHp: b.hp, atk: b.atk, q: b.q, pool: b.q, boss: opt.boss, r: opt.boss, lvl: opt.boss * 3 + 4 };
+    e = { name: b.name, color: b.color, shape: b.shape, hp: Math.round(b.hp * BOSS_HP), maxHp: Math.round(b.hp * BOSS_HP), atk: b.atk, q: b.q, pool: b.q, boss: opt.boss, r: opt.boss, lvl: opt.boss * 3 + 4 };
   } else {
     const sp = SPECIES[opt.c.sp], lv = opt.c.lvl;
     e = { name: sp.name, key: opt.c.sp, color: sp.color, shape: sp.shape, hp: Math.round((sp.hp + lv * 3) * CREATURE_HP), maxHp: Math.round((sp.hp + lv * 3) * CREATURE_HP), atk: sp.atk + Math.floor(lv / 2), q: sp.q, r: sp.r, lvl: lv, ent: opt.c,
@@ -893,14 +898,14 @@ function resolveAction(id, correct) {
   }
   const mult = streakMult();
   if (id === 'attack' || id === 'special') {
-    const dmg = Math.round((atkPow() * (id === 'special' ? 2.4 : 1) + randInt(0, 4)) * mult);
+    const dmg = Math.max(1, Math.round((atkPow() * (id === 'special' ? 2.4 : 1) + randInt(0, 4)) * mult * PLAYER_POWER));
     e.hp = Math.max(0, e.hp - dmg); popNum('e', '-' + dmg, '#ff4d6d'); b.shake = 0.4; Sound.hit();
     blog(`${id === 'special' ? 'ATP BURST' : 'Hit'} for ${dmg}!${mult > 1 ? ` (streak x${mult.toFixed(2)})` : ''}`);
     burst(W * 0.72, H * 0.3, e.color, id === 'special' ? 40 : 18);
   } else if (id === 'heal') {
     let amt;
     if (s.superPotions > 0 && s.hp < maxHp() - 60) { s.superPotions--; amt = 100; } else if (s.potions > 0) { s.potions--; amt = 40; } else amt = 18;
-    amt = Math.round((amt + compBonus('heal')) * (mult > 1 ? 1.2 : 1));
+    amt = Math.round((amt + compBonus('heal')) * HEAL_POWER * (mult > 1 ? 1.2 : 1));
     s.hp = Math.min(maxHp(), s.hp + amt); popNum('p', '+' + amt, '#80ed99'); blog(`Healed ${amt} HP.`);
     burst(W * 0.28, H * 0.5, '#80ed99', 20);
   } else if (id === 'defend') {
@@ -918,12 +923,12 @@ function enemyTurn() {
   const e = b.e, s = game.save;
   b.turnN++;
   // Guardians charge a big attack every 3rd turn - a perfect time to Defend!
-  let power = Math.round(e.atk * ENEMY_POWER);
+  let power = e.atk * ENEMY_POWER;
   if (e.boss !== undefined) {
-    if (b.charge) { power = Math.round(e.atk * ENEMY_POWER * 2.2); b.charge = false; blog(`${e.name} unleashes its charged attack!`); }
+    if (b.charge) { power = e.atk * ENEMY_POWER * 2.2; b.charge = false; blog(`${e.name} unleashes its charged attack!`); }
     else if (b.turnN % 3 === 0) { b.charge = true; blog(`${e.name} is charging up... DEFEND next turn!`); return finishEnemy(); }
   }
-  let dmg = Math.max(1, Math.round(power + randInt(-2, 3) - defPow()));
+  let dmg = Math.max(1, Math.round(power + randInt(-1, 1) - defPow() * DEF_POWER));
   if (b.defending) dmg = Math.ceil(dmg / 2);
   b.defending = false;
   s.hp = Math.max(0, s.hp - dmg); popNum('p', '-' + dmg, '#ff4d6d'); Sound.hit();
