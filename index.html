@@ -902,6 +902,13 @@ function resolveAction(id, correct) {
     e.hp = Math.max(0, e.hp - dmg); popNum('e', '-' + dmg, '#ff4d6d'); b.shake = 0.4; Sound.hit();
     blog(`${id === 'special' ? 'ATP BURST' : 'Hit'} for ${dmg}!${mult > 1 ? ` (streak x${mult.toFixed(2)})` : ''}`);
     burst(W * 0.72, H * 0.3, e.color, id === 'special' ? 40 : 18);
+    // ENERGY-GENERATING ATTACK: a CORRECT basic Attack refunds its 1 ATP, so your
+    // ATP ends up the same as before the attack (passive regen still adds +1 after
+    // the enemy's turn). A wrong Attack is NOT refunded. Only the basic Attack gets this.
+    if (id === 'attack') {
+      b.energy = Math.min(MAX_ATP, b.energy + cost);
+      popNum('p', '+' + cost + ' ATP', '#ffd166'); blog(`+${cost} ATP refunded.`);
+    }
   } else if (id === 'heal') {
     let amt;
     if (s.superPotions > 0 && s.hp < maxHp() - 60) { s.superPotions--; amt = 100; } else if (s.potions > 0) { s.potions--; amt = 40; } else amt = 18;
@@ -1085,7 +1092,7 @@ function startGame(fresh) {
   updateTouchUI(); grabFocus();
   if (!loaded) {
     saveGame();
-    dialog('Professor Ribo', ['Welcome, Explorer! You have been shrunk down and sent INSIDE a cell.', 'The cell is running out of ATP - its energy currency. Five regions, five guardians, and one giant turbine: ATP SYNTHASE.', 'In battle, EVERY move needs a correct answer. Right = the move works (streaks hit harder!). Wrong = you lose the ATP the move cost AND your turn (you still see the answer so you learn it).', 'Move: WASD / arrow keys (or drag on a phone). Talk: E or Space. Codex: C. In battle, press 1-6 or tap the buttons. Come talk to me first - I have quests!']);
+    dialog('Professor Ribo', ['Welcome, Explorer! You have been shrunk down and sent INSIDE a cell.', 'The cell is running out of ATP - its energy currency. Five regions, five guardians, and one giant turbine: ATP SYNTHASE.', 'In battle, EVERY move needs a correct answer. Right = the move works (streaks hit harder!). Wrong = you lose the ATP the move cost AND your turn (you still see the answer so you learn it). Tip: a CORRECT basic Attack refunds its 1 ATP, so it never drains your energy!', 'Move: WASD / arrow keys (or drag on a phone). Talk: E or Space. Codex: C. In battle, press 1-6 or tap the buttons. Come talk to me first - I have quests!']);
   } else toast('Welcome back! Progress loaded.');
 }
 function update(dt) {
@@ -1368,7 +1375,7 @@ $('btn-continue').addEventListener('click', (e) => { e.stopPropagation(); Sound.
 $('nojs').style.display = 'none';
 requestAnimationFrame(loop);
 // Handy for automated tests (and curious players in the browser console)
-window.CQ = { game, QUESTIONS, TOPICS, SPECIES, BOSSES, qStat, totalMastery, topicMastery, chooseAction, startBattle, saveGame, loadGame, checkFill, talkTo, GATES, TILE, REG_W, MASTER_BOX };
+window.CQ = { game, resolveAction, QUESTIONS, TOPICS, SPECIES, BOSSES, qStat, totalMastery, topicMastery, chooseAction, startBattle, saveGame, loadGame, checkFill, talkTo, GATES, TILE, REG_W, MASTER_BOX };
 
 </script>
 </body>
