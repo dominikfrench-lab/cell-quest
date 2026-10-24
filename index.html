@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Cell Quest: The ATP Odyssey</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f1a; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; outline: none; }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; }
+  #nojs, #err { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; background: #0b0f1a; font-size: 18px; z-index: 50; }
+  #err { display: none; background: rgba(60,0,10,0.95); flex-direction: column; }
+  /* Title screen */
+  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; }
+  #title h1 { margin: 0; font-size: clamp(34px, 8vw, 68px); letter-spacing: 2px; background: linear-gradient(90deg, #7ff0de, #ffd166, #ff4d6d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #title p { margin: 0; max-width: 560px; color: #cfd8ff; }
+  .big { padding: 14px 34px; border-radius: 14px; border: 0; background: #ffd166; color: #222; font-weight: bold; font-size: 18px; min-width: 220px; }
+  .big.alt { background: #7ff0de; }
+  /* HUD buttons (top, under the stats) */
+  #hud { position: fixed; left: 8px; top: 118px; display: none; gap: 6px; z-index: 5; }
+  #hud button { background: rgba(10,14,28,0.85); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  /* Touch buttons - only shown after a real touch */
+  #touchbtns { position: fixed; right: 18px; bottom: calc(24px + env(safe-area-inset-bottom)); display: none; gap: 14px; z-index: 5; }
+  #touchbtns button { width: 74px; height: 74px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.6); background: rgba(255,209,102,0.45); color: #fff; font-size: 22px; font-weight: bold; }
+  #touchbtns #tb-c { background: rgba(127,240,222,0.4); font-size: 15px; }
+  /* Battle action buttons */
+  #actions { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom)); width: min(760px, 96vw); display: none; grid-template-columns: repeat(3, 1fr); gap: 8px; z-index: 6; }
+  .act { background: rgba(20,26,48,0.95); color: #fff; border: 2px solid #7ff0de; border-radius: 12px; padding: 8px 6px; font-weight: bold; font-size: 16px; text-align: left; }
+  .act small { display: block; font-weight: normal; font-size: 11px; color: #b8c4ff; }
+  .act:disabled { opacity: 0.35; }
+  .num { display: inline-block; min-width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 6px; background: #ffd166; color: #222; font-size: 12px; margin-right: 6px; font-weight: bold; }
+  /* Question card + panels */
+  #qbox, #panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(680px, 95vw); max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #141a30; border: 2px solid #7ff0de; border-radius: 16px; padding: 16px; display: none; z-index: 10; box-shadow: 0 10px 40px rgba(0,0,0,0.6); -webkit-user-select: text; user-select: text; touch-action: pan-y; }
+  #qbox { border-color: #ffd166; z-index: 11; }
+  .qtag { font-size: 12px; color: #9fb0e8; margin-bottom: 6px; }
+  .streak { color: #ffd166; }
+  .qtext { font-size: 19px; font-weight: bold; margin-bottom: 12px; line-height: 1.3; }
+  .choice { display: block; width: 100%; text-align: left; margin: 6px 0; padding: 11px 12px; border-radius: 10px; border: 2px solid #3a4677; background: #1e2645; color: #fff; font-size: 15px; }
+  .choice:not(:disabled):hover { border-color: #7ff0de; }
+  .choice.right, select.right { border-color: #80ed99 !important; background: #1d4a2c !important; }
+  .choice.wrong, select.wrong { border-color: #ff4d6d !important; background: #5a1d2a !important; }
+  .choice.submit { text-align: center; background: #ffd166; color: #222; font-weight: bold; border-color: #ffd166; }
+  .choice:disabled { cursor: default; }
+  #fillin { width: 100%; padding: 12px; font-size: 17px; border-radius: 10px; border: 2px solid #3a4677; background: #0d1226; color: #fff; }
+  .mrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+  .mrow span { flex: 1; font-weight: bold; }
+  .mrow select { flex: 1.3; padding: 9px; font-size: 15px; border-radius: 8px; background: #0d1226; color: #fff; border: 2px solid #3a4677; max-width: 60%; }
+  .fb { margin-top: 10px; padding: 10px 12px; border-radius: 10px; line-height: 1.4; }
+  .fb.ok { background: #183d27; border: 1px solid #80ed99; }
+  .fb.no { background: #3d1820; border: 1px solid #ff4d6d; }
+  .why { color: #dfe6ff; font-size: 14px; margin-top: 4px; }
+  .mast { color: #ffd166; font-size: 13px; margin-top: 6px; }
+  .hint { color: #ffd166; margin-top: 6px; }
+  .dlg .who { color: #7ff0de; font-weight: bold; margin-bottom: 6px; }
+  .dlg .say { font-size: 17px; line-height: 1.45; margin-bottom: 10px; }
+  .dlg.end .who { font-size: 26px; color: #ffd166; text-align: center; }
+  .ptitle { font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .ptitle .coins { font-size: 14px; color: #ffd166; }
+  .close { margin-left: auto; background: #ff4d6d; color: #fff; border: 0; border-radius: 8px; width: 36px; height: 36px; font-weight: bold; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .tabs button { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #3a4677; background: #1e2645; color: #fff; }
+  .tabs button.on { background: #7ff0de; color: #111; font-weight: bold; }
+  .item { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 8px; border-bottom: 1px solid #263055; }
+  .item .grow { flex: 1; }
+  .item.locked { opacity: 0.55; }
+  .buy { background: #ffd166; color: #222; border: 0; border-radius: 8px; padding: 8px 12px; font-weight: bold; min-width: 70px; }
+  .buy:disabled { opacity: 0.4; }
+  .small { font-size: 13px; color: #b8c4ff; margin: 8px 0; }
+  .topic { margin: 12px 0 4px; display: flex; align-items: center; gap: 8px; }
+  .bar { flex: 1; height: 10px; background: #263055; border-radius: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: #7ff0de; }
+  .qrow { padding: 6px 4px; border-bottom: 1px solid #1f2848; font-size: 14px; }
+  .qrow summary { cursor: pointer; }
+  .st { color: #ffd166; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="0"></canvas>
+<!-- Shown if JavaScript can't run (for example, an email preview). -->
+<div id="nojs">Cell Quest needs JavaScript to run.<br><br>Open this file in Safari, Chrome, or Edge (not inside an email or file preview).</div>
+<div id="err"><b>Oops - something broke.</b><pre id="errmsg" style="white-space:pre-wrap;font-size:13px;max-width:90vw"></pre><button class="big" onclick="location.reload()">Reload</button></div>
+<div id="title">
+  <h1>CELL QUEST</h1>
+  <p><b>The ATP Odyssey.</b> Shrink down inside a cell, befriend molecule creatures and battle five guardians. Every move you make is powered by a correct answer!</p>
+  <button class="big" id="btn-continue">Continue</button>
+  <button class="big alt" id="btn-new">New Game</button>
+  <p style="font-size:13px;opacity:.8">PC: WASD / arrows to move, E to talk, C for the Codex, 1-6 in battle.<br>Phone: drag on the left to move, tap the buttons.</p>
+</div>
+<div id="hud"><button id="hud-codex">Codex (C)</button><button id="hud-mute">Sound (M)</button></div>
+<div id="touchbtns"><button id="tb-c">Codex</button><button id="tb-a">A</button></div>
+<div id="actions"></div>
+<div id="qbox"></div>
+<div id="panel"></div>
+<script>
+// Show any error on screen instead of a silent blank page (very helpful on phones).
+function showError(err) {
+  document.getElementById('err').style.display = 'flex';
+  document.getElementById('errmsg').textContent = String(err && err.stack || err);
+}
+window.onerror = function (msg, src, line, col, err) { showError(err || (msg + ' (line ' + line + ')')); };
+</script>
+<script>
+// ====================== QUESTION BANK ======================
+// Each question (id 1-30) has an explanation and several "variants".
+// Variant types:
+//   mc    : multiple choice. a = correct answer, d = wrong answers (distractors)
+//   tf    : true/false. q = statement, a = true or false
+//   fill  : type the answer. accept = list of accepted words (lowercase); answer = shown answer
+//   match : match left items to right items. pairs = [[left, right], ...]
+const TOPICS = [
+  { id: 0, name: 'ATP Structure', region: 'Nucleotide Narrows' },
+  { id: 1, name: 'Storing & Releasing Energy', region: 'Hydrolysis Hollows' },
+  { id: 2, name: 'Recharging ADP & the ATP Cycle', region: 'Cycle Springs' },
+  { id: 3, name: 'Cellular Work', region: 'Motor Protein Works' },
+  { id: 4, name: 'Cellular Respiration', region: 'Mitochondrion' },
+];
+const QUESTIONS = [
+ { id: 1, t: 0, text: 'What three parts make up an ATP molecule?',
+   ex: 'ATP = adenine (a nitrogenous base) + ribose (a 5-carbon sugar) + a chain of three phosphate groups.',
+   v: [
+    { type: 'mc', q: 'What three parts make up an ATP molecule?', a: 'Adenine, ribose, and three phosphate groups', d: ['Adenine, deoxyribose, and two phosphate groups', 'Guanine, ribose, and three phosphate groups', 'Adenine, glucose, and one phosphate group'] },
+    { type: 'match', q: 'Match each part of ATP to what it is.', pairs: [['Adenine', 'Nitrogenous base'], ['Ribose', '5-carbon sugar'], ['Triphosphate tail', 'Three phosphate groups']] },
+    { type: 'tf', q: 'True or false: ATP is made of adenine, ribose, and three phosphate groups.', a: true },
+   ] },
+ { id: 2, t: 0, text: 'What kind of sugar is in ATP?',
+   ex: 'ATP contains ribose, a five-carbon (pentose) sugar - the same sugar found in RNA (DNA uses deoxyribose).',
+   v: [
+    { type: 'mc', q: 'What kind of sugar is in ATP?', a: 'Ribose (a 5-carbon sugar)', d: ['Deoxyribose', 'Glucose (a 6-carbon sugar)', 'Fructose'] },
+    { type: 'fill', q: 'The 5-carbon sugar in ATP is called ______.', accept: ['ribose', 'a ribose', 'ribose sugar'], answer: 'ribose' },
+    { type: 'tf', q: 'True or false: The sugar in ATP is deoxyribose, the same sugar as in DNA.', a: false },
+   ] },
+ { id: 3, t: 0, text: 'What nitrogenous base is in ATP?',
+   ex: 'The base in ATP is adenine (the "A" in ATP), a purine. Adenine + ribose together are called adenosine.',
+   v: [
+    { type: 'mc', q: 'What nitrogenous base is in ATP?', a: 'Adenine', d: ['Guanine', 'Thymine', 'Cytosine'] },
+    { type: 'fill', q: 'The "A" in ATP stands for adenosine, which contains the nitrogenous base ______.', accept: ['adenine'], answer: 'adenine' },
+    { type: 'tf', q: 'True or false: The nitrogenous base in ATP is adenine.', a: true },
+   ] },
+ { id: 4, t: 0, text: 'How many phosphate groups does ATP have, and how many does ADP have?',
+   ex: 'ATP (adenosine TRIphosphate) has 3 phosphate groups; ADP (adenosine DIphosphate) has 2.',
+   v: [
+    { type: 'mc', q: 'How many phosphate groups do ATP and ADP have?', a: 'ATP has 3; ADP has 2', d: ['ATP has 2; ADP has 1', 'ATP has 3; ADP has 1', 'ATP has 4; ADP has 3'] },
+    { type: 'match', q: 'Match each molecule to its number of phosphate groups.', pairs: [['ATP', '3 phosphates'], ['ADP', '2 phosphates'], ['AMP', '1 phosphate']] },
+    { type: 'fill', q: 'ADP has how many phosphate groups? (type a number)', accept: ['2', 'two'], answer: '2' },
+   ] },
+ { id: 5, t: 0, text: "Why are the bonds between ATP's phosphate groups unstable?",
+   ex: 'All three phosphate groups carry negative charges. Packed close together, they repel each other, so the bonds holding them are unstable and easily broken (like a compressed spring).',
+   v: [
+    { type: 'mc', q: "Why are the bonds between ATP's phosphate groups unstable?", a: 'The negatively charged phosphate groups repel each other', d: ['The phosphates are positively charged and attract water too strongly', 'Ribose pulls electrons away from adenine', 'The bonds are hydrogen bonds, which are always weak'] },
+    { type: 'tf', q: "True or false: ATP's phosphate tail is unstable because its negatively charged phosphate groups repel each other.", a: true },
+    { type: 'mc', q: "ATP's phosphate tail is often compared to a compressed spring. Why?", a: 'Crowded negative charges repel, storing energy that is released when a phosphate breaks off', d: ['The phosphates are coiled in a helix like DNA', 'Positive charges pull the phosphates tightly together', 'The tail stretches when it absorbs water'] },
+   ] },
+ { id: 6, t: 1, text: 'Which bond breaks when ATP releases energy?',
+   ex: 'The bond between the second and third (terminal) phosphate groups breaks, releasing the outermost phosphate.',
+   v: [
+    { type: 'mc', q: 'Which bond breaks when ATP releases energy?', a: 'The bond between the 2nd and 3rd (outermost) phosphate groups', d: ['The bond between adenine and ribose', 'The bond between ribose and the first phosphate', 'A hydrogen bond inside adenine'] },
+    { type: 'tf', q: 'True or false: When ATP releases energy, the bond between adenine and ribose breaks.', a: false },
+    { type: 'fill', q: 'When ATP releases energy, the bond to the ______ (outermost/terminal) phosphate group breaks.', accept: ['third', '3rd', 'terminal', 'last', 'outermost', 'outer', '3', 'final', 'gamma'], answer: 'third (terminal)' },
+   ] },
+ { id: 7, t: 1, text: 'What are the products when ATP is hydrolyzed?',
+   ex: 'ATP + H2O -> ADP + Pi (an inorganic phosphate) + energy.',
+   v: [
+    { type: 'mc', q: 'What are the products when ATP is hydrolyzed?', a: 'ADP, an inorganic phosphate (Pi), and energy', d: ['AMP and glucose', 'ADP, water, and oxygen', 'Adenine, ribose, and carbon dioxide'] },
+    { type: 'fill', q: 'ATP + H2O -> ______ + Pi + energy', accept: ['adp', 'adenosine diphosphate'], answer: 'ADP' },
+    { type: 'tf', q: 'True or false: Hydrolyzing ATP produces ADP plus a free inorganic phosphate (Pi).', a: true },
+   ] },
+ { id: 8, t: 1, text: 'What is ATP hydrolysis, and why does it need water?',
+   ex: 'Hydrolysis means "splitting with water." A water molecule is used to break the terminal phosphate bond: the -OH and -H from H2O attach to the separated phosphate and ADP.',
+   v: [
+    { type: 'mc', q: 'What is ATP hydrolysis, and why does it need water?', a: 'Breaking off a phosphate using water; H2O supplies the -H and -OH that attach to the split pieces', d: ['Adding a phosphate to ADP; water carries the phosphate', 'Dissolving ATP in water so it can diffuse', 'Making ATP from glucose; water is a byproduct'] },
+    { type: 'fill', q: '"Hydro" means water and "lysis" means ______.', accept: ['split', 'splitting', 'to split', 'break', 'breaking', 'to break', 'loosen', 'cut', 'breaking apart', 'split apart'], answer: 'splitting / breaking' },
+    { type: 'tf', q: 'True or false: In ATP hydrolysis, a water molecule is used up to break the bond to the last phosphate.', a: true },
+   ] },
+ { id: 9, t: 1, text: 'Is ATP hydrolysis exergonic or endergonic?',
+   ex: 'Exergonic: ATP hydrolysis releases free energy (negative delta G) and happens spontaneously.',
+   v: [
+    { type: 'mc', q: 'Is ATP hydrolysis exergonic or endergonic?', a: 'Exergonic - it releases free energy (negative delta G)', d: ['Endergonic - it absorbs free energy', 'Neither - delta G is zero', 'Endergonic - it releases heat'] },
+    { type: 'tf', q: 'True or false: ATP hydrolysis is an endergonic reaction.', a: false },
+    { type: 'fill', q: 'ATP hydrolysis releases energy, so it is ______ (exergonic/endergonic).', accept: ['exergonic'], answer: 'exergonic' },
+   ] },
+ { id: 10, t: 1, text: 'About how much free energy is released when ATP is hydrolyzed under standard conditions?',
+   ex: 'Under standard conditions, delta G is about -7.3 kcal/mol (about -30.5 kJ/mol).',
+   v: [
+    { type: 'mc', q: 'About how much free energy is released by ATP hydrolysis under standard conditions?', a: 'About -7.3 kcal/mol (-30.5 kJ/mol)', d: ['About -13 kcal/mol (-50 kJ/mol)', 'About -686 kcal/mol', 'About -1.5 kcal/mol (-6 kJ/mol)'] },
+    { type: 'fill', q: 'Under standard conditions ATP hydrolysis releases about ____ kcal/mol (type the number).', accept: ['7.3', '-7.3', '7.3 kcal/mol', '-7.3 kcal/mol', '7', '-7'], answer: '-7.3 kcal/mol' },
+    { type: 'tf', q: 'True or false: Under standard conditions, ATP hydrolysis releases about 30.5 kJ/mol (7.3 kcal/mol).', a: true },
+   ] },
+ { id: 11, t: 1, text: 'About how much free energy is released when ATP is hydrolyzed under cellular conditions?',
+   ex: 'Inside a living cell, delta G is about -13 kcal/mol (around -50 kJ/mol) - nearly twice the standard value.',
+   v: [
+    { type: 'mc', q: 'About how much free energy is released by ATP hydrolysis under cellular conditions?', a: 'About -13 kcal/mol (around -50 kJ/mol)', d: ['About -7.3 kcal/mol (-30.5 kJ/mol)', 'About -2 kcal/mol', 'About -100 kcal/mol'] },
+    { type: 'fill', q: 'Inside a cell, ATP hydrolysis releases about ____ kcal/mol (type the number).', accept: ['13', '-13', '13 kcal/mol', '-13 kcal/mol', '12', '14'], answer: 'about -13 kcal/mol' },
+    { type: 'tf', q: 'True or false: Inside a cell, ATP hydrolysis releases LESS energy than under standard conditions.', a: false },
+   ] },
+ { id: 12, t: 1, text: 'Why is more energy released inside a cell than under standard conditions?',
+   ex: 'Cells keep [ATP] far higher than [ADP] and [Pi] - far from equilibrium (not the 1 M standard concentrations). The farther a reaction is from equilibrium, the more negative its delta G.',
+   v: [
+    { type: 'mc', q: 'Why does ATP hydrolysis release more energy in a cell than under standard conditions?', a: 'The cell keeps ATP concentration much higher than ADP and Pi, far from equilibrium', d: ['Cells are hotter than 100 degrees C', 'Enzymes add extra energy to the reaction', 'Cells contain more water, which stores energy'] },
+    { type: 'tf', q: 'True or false: Because cells keep the ATP:ADP ratio high (far from equilibrium), hydrolysis releases more free energy in a cell.', a: true },
+    { type: 'mc', q: 'Standard conditions assume 1 M of every reactant and product. How is a real cell different?', a: 'It holds much more ATP than ADP and Pi, so the reaction is far from equilibrium', d: ['It holds equal amounts of ATP and ADP', 'It holds no water', 'It holds much more ADP than ATP'] },
+   ] },
+ { id: 13, t: 2, text: 'What has to be added to ADP to make ATP again?',
+   ex: 'A phosphate group (Pi) plus energy must be added to ADP: ADP + Pi + energy -> ATP + H2O.',
+   v: [
+    { type: 'mc', q: 'What has to be added to ADP to make ATP again?', a: 'A phosphate group (Pi) and energy', d: ['A water molecule', 'An adenine base', 'A ribose sugar and oxygen'] },
+    { type: 'fill', q: 'ADP + ______ + energy -> ATP + H2O', accept: ['pi', 'p', 'phosphate', 'a phosphate', 'phosphate group', 'a phosphate group', 'inorganic phosphate'], answer: 'Pi (a phosphate group)' },
+    { type: 'tf', q: 'True or false: To rebuild ATP, a phosphate group and energy are added to ADP.', a: true },
+   ] },
+ { id: 14, t: 2, text: 'Is making ATP from ADP exergonic or endergonic? Why?',
+   ex: 'Endergonic: making ATP is the reverse of hydrolysis, so it requires an input of free energy (about +7.3 kcal/mol under standard conditions) to force a negatively charged phosphate onto ADP.',
+   v: [
+    { type: 'mc', q: 'Is making ATP from ADP exergonic or endergonic?', a: 'Endergonic - it is the reverse of hydrolysis, so it requires energy input', d: ['Exergonic - it releases the energy stored in ADP', 'Exergonic - because water is released', 'Neither - it needs no energy'] },
+    { type: 'tf', q: 'True or false: Making ATP from ADP and Pi is exergonic.', a: false },
+    { type: 'fill', q: 'Adding a phosphate to ADP needs energy, so it is ______ (exergonic/endergonic).', accept: ['endergonic'], answer: 'endergonic' },
+   ] },
+ { id: 15, t: 2, text: 'Where does the energy to regenerate ATP come from?',
+   ex: 'From exergonic catabolic reactions - mainly cellular respiration breaking down food molecules like glucose (in plants the energy ultimately comes from sunlight via photosynthesis).',
+   v: [
+    { type: 'mc', q: 'Where does the energy to regenerate ATP come from?', a: 'Exergonic breakdown of food molecules, mainly through cellular respiration', d: ['From breaking down more ATP', 'From water absorbed by the cell', 'From the nucleus, which stores energy in DNA'] },
+    { type: 'tf', q: 'True or false: The energy to remake ATP comes from catabolic reactions such as cellular respiration.', a: true },
+    { type: 'mc', q: 'Which process supplies most of the energy that animal cells use to regenerate ATP?', a: 'Cellular respiration (breaking down glucose)', d: ['Protein synthesis', 'Osmosis', 'DNA replication'] },
+   ] },
+ { id: 16, t: 2, text: 'What is the ATP cycle?',
+   ex: 'The ATP cycle is the continuous loop of ATP being hydrolyzed to ADP + Pi (releasing energy for work) and then ADP being re-phosphorylated back to ATP using energy from catabolism.',
+   v: [
+    { type: 'mc', q: 'What is the ATP cycle?', a: 'The continuous loop of ATP being hydrolyzed to ADP + Pi and ADP being regenerated into ATP', d: ['The cycle that breaks glucose into CO2 in the mitochondrion', 'A cycle where ATP turns into DNA and back', 'The movement of ATP in and out of the nucleus'] },
+    { type: 'tf', q: 'True or false: In the ATP cycle, ATP is used up to ADP and then recharged back to ATP, over and over.', a: true },
+    { type: 'match', q: 'Match each half of the ATP cycle.', pairs: [['ATP -> ADP + Pi', 'Releases energy (exergonic)'], ['ADP + Pi -> ATP', 'Requires energy (endergonic)'], ['Energy source for recharging', 'Cellular respiration']] },
+   ] },
+ { id: 17, t: 2, text: 'What is phosphorylation?',
+   ex: 'Phosphorylation is the transfer (addition) of a phosphate group to a molecule. Adding a phosphate from ATP to another molecule makes it a "phosphorylated intermediate" that is more reactive.',
+   v: [
+    { type: 'mc', q: 'What is phosphorylation?', a: 'Adding a phosphate group to a molecule', d: ['Removing water from a molecule', 'Adding oxygen to a molecule', 'Splitting glucose in half'] },
+    { type: 'fill', q: 'Adding a phosphate group to a molecule is called ______.', accept: ['phosphorylation'], answer: 'phosphorylation' },
+    { type: 'tf', q: 'True or false: Phosphorylation means removing a phosphate group from a molecule.', a: false },
+   ] },
+ { id: 18, t: 2, text: 'How does energy coupling let the cell use exergonic reactions to drive endergonic ones?',
+   ex: 'In energy coupling, ATP hydrolysis (exergonic) is linked to an endergonic reaction, usually by transferring ATP\'s phosphate to a reactant (phosphorylation). The overall combined delta G is negative, so the coupled reaction runs.',
+   v: [
+    { type: 'mc', q: 'How does energy coupling let exergonic reactions drive endergonic ones?', a: "ATP's phosphate is transferred to a reactant, so the combined reactions have a negative overall delta G", d: ['The cell heats up to give endergonic reactions energy', 'Endergonic reactions are sped up by removing enzymes', 'ATP absorbs energy from the endergonic reaction'] },
+    { type: 'tf', q: 'True or false: Energy coupling works because the total delta G of the coupled reactions is negative.', a: true },
+    { type: 'mc', q: 'Glutamic acid + NH3 -> glutamine (+3.4 kcal/mol) is coupled to ATP hydrolysis (-7.3 kcal/mol). What is the overall delta G?', a: 'About -3.9 kcal/mol, so the coupled reaction is spontaneous', d: ['About +10.7 kcal/mol, so it cannot happen', 'About +3.9 kcal/mol, so it needs more ATP', 'Exactly 0, so it is at equilibrium'] },
+   ] },
+ { id: 19, t: 3, text: 'What are the three main kinds of cellular work that ATP powers?',
+   ex: 'Mechanical work (movement), transport work (pumping substances against gradients), and chemical work (driving endergonic reactions like building polymers).',
+   v: [
+    { type: 'mc', q: 'What are the three main kinds of cellular work that ATP powers?', a: 'Mechanical, transport, and chemical work', d: ['Thermal, electrical, and nuclear work', 'Mechanical, magnetic, and osmotic work', 'Digestive, genetic, and thermal work'] },
+    { type: 'match', q: 'Match each kind of cellular work to an example.', pairs: [['Mechanical', 'Muscle contraction'], ['Transport', 'Sodium-potassium pump'], ['Chemical', 'Building proteins from amino acids']] },
+    { type: 'tf', q: 'True or false: The three kinds of cellular work are mechanical, transport, and chemical.', a: true },
+   ] },
+ { id: 20, t: 3, text: 'Give an example of mechanical work powered by ATP.',
+   ex: 'Examples: muscle contraction (myosin pulling actin), flagella and cilia beating, motor proteins like kinesin "walking" vesicles along microtubules, chromosome movement.',
+   v: [
+    { type: 'mc', q: 'Which is an example of mechanical work powered by ATP?', a: 'Myosin pulling actin filaments during muscle contraction', d: ['The sodium-potassium pump moving ions', 'Building a protein from amino acids', 'Oxygen diffusing into a cell'] },
+    { type: 'tf', q: 'True or false: The beating of cilia and flagella is mechanical work powered by ATP.', a: true },
+    { type: 'mc', q: 'A motor protein (kinesin) carries a vesicle along a microtubule. What kind of work is this?', a: 'Mechanical work', d: ['Chemical work', 'Transport work through a membrane pump', 'No work - it is passive diffusion'] },
+   ] },
+ { id: 21, t: 3, text: 'How does ATP power transport work, like the sodium-potassium pump?',
+   ex: 'ATP phosphorylates the pump protein. That changes the protein\'s shape, so it moves ions against their concentration gradients (active transport): 3 Na+ out and 2 K+ in per ATP.',
+   v: [
+    { type: 'mc', q: 'How does ATP power the sodium-potassium pump?', a: "It phosphorylates the pump, changing its shape so it moves 3 Na+ out and 2 K+ in against their gradients", d: ['It dissolves the membrane so ions can leak through', 'It binds to sodium ions and carries them by diffusion', 'It cools the membrane so ions slow down'] },
+    { type: 'tf', q: 'True or false: The sodium-potassium pump moves ions DOWN their concentration gradients, so it needs no ATP.', a: false },
+    { type: 'match', q: 'Match each part of the sodium-potassium pump cycle.', pairs: [['Na+ ions', '3 pumped out of the cell'], ['K+ ions', '2 pumped into the cell'], ['Phosphate from ATP', 'Changes the pump\'s shape']] },
+   ] },
+ { id: 22, t: 3, text: 'How does ATP power chemical work in the cell?',
+   ex: 'ATP transfers a phosphate to a reactant, forming a more reactive phosphorylated intermediate. This couples ATP hydrolysis to endergonic reactions such as building polymers (e.g. glutamine or protein synthesis).',
+   v: [
+    { type: 'mc', q: 'How does ATP power chemical work?', a: 'It phosphorylates a reactant, making a reactive intermediate that drives an endergonic reaction', d: ['It splits water to make oxygen', 'It acts as a catalyst without being changed', 'It moves molecules across the membrane'] },
+    { type: 'tf', q: 'True or false: In chemical work, ATP drives endergonic reactions like building polymers from monomers.', a: true },
+    { type: 'fill', q: 'A molecule that has received a phosphate from ATP is called a ______ intermediate.', accept: ['phosphorylated'], answer: 'phosphorylated' },
+   ] },
+ { id: 23, t: 4, text: 'What is the overall equation for cellular respiration?',
+   ex: 'C6H12O6 + 6 O2 -> 6 CO2 + 6 H2O + energy (ATP + heat).',
+   v: [
+    { type: 'mc', q: 'What is the overall equation for cellular respiration?', a: 'C6H12O6 + 6O2 -> 6CO2 + 6H2O + energy (ATP)', d: ['6CO2 + 6H2O + light -> C6H12O6 + 6O2', 'C6H12O6 -> 2 C2H5OH + 2CO2 + energy', 'C6H12O6 + 6CO2 -> 6O2 + 6H2O + energy'] },
+    { type: 'match', q: 'Sort the parts of cellular respiration.', pairs: [['Glucose + oxygen', 'Reactants'], ['Carbon dioxide + water', 'Products'], ['ATP', 'Energy captured']] },
+    { type: 'tf', q: 'True or false: The reactants of cellular respiration are glucose and oxygen.', a: true },
+   ] },
+ { id: 24, t: 4, text: 'Where in the cell does glycolysis happen, and what are its main products?',
+   ex: 'Glycolysis happens in the cytoplasm (cytosol). One glucose -> 2 pyruvate, a net 2 ATP, and 2 NADH.',
+   v: [
+    { type: 'mc', q: 'Where does glycolysis happen, and what are its main products?', a: 'In the cytoplasm; 2 pyruvate, net 2 ATP, and 2 NADH', d: ['In the mitochondrial matrix; 6 CO2 and 2 ATP', 'On the inner mitochondrial membrane; about 28 ATP', 'In the nucleus; 2 glucose and 2 FADH2'] },
+    { type: 'fill', q: 'Glycolysis takes place in the ______.', accept: ['cytoplasm', 'cytosol', 'the cytoplasm', 'the cytosol'], answer: 'cytoplasm (cytosol)' },
+    { type: 'tf', q: 'True or false: Glycolysis splits one glucose into two pyruvate molecules.', a: true },
+   ] },
+ { id: 25, t: 4, text: 'Where does the Krebs (citric acid) cycle happen, and what are its main products?',
+   ex: 'In the mitochondrial matrix. Per glucose (2 turns): 4 CO2 (6 counting pyruvate oxidation), 2 ATP, 6 NADH, and 2 FADH2.',
+   v: [
+    { type: 'mc', q: 'Where does the Krebs cycle happen, and what are its main products?', a: 'Mitochondrial matrix; CO2, NADH, FADH2, and a little ATP', d: ['Cytoplasm; pyruvate and 2 NADH', 'Outer mitochondrial membrane; O2 and water', 'Inner membrane; about 28 ATP and water'] },
+    { type: 'fill', q: 'The Krebs cycle takes place in the mitochondrial ______.', accept: ['matrix'], answer: 'matrix' },
+    { type: 'tf', q: 'True or false: Per glucose, the Krebs cycle produces 2 ATP, 6 NADH, 2 FADH2, and releases CO2.', a: true },
+   ] },
+ { id: 26, t: 4, text: 'Where does the electron transport chain happen?',
+   ex: 'The ETC is a series of proteins embedded in the inner mitochondrial membrane (on the cristae).',
+   v: [
+    { type: 'mc', q: 'Where does the electron transport chain happen?', a: 'In the inner mitochondrial membrane (cristae)', d: ['In the cytoplasm', 'In the mitochondrial matrix', 'In the outer mitochondrial membrane'] },
+    { type: 'fill', q: 'The electron transport chain is in the ______ mitochondrial membrane.', accept: ['inner', 'the inner'], answer: 'inner' },
+    { type: 'tf', q: 'True or false: The electron transport chain is located in the outer mitochondrial membrane.', a: false },
+   ] },
+ { id: 27, t: 4, text: 'What roles do NADH and FADH2 play in cellular respiration?',
+   ex: 'NADH and FADH2 are electron carriers. They pick up high-energy electrons (and H+) during glycolysis and the Krebs cycle and deliver them to the electron transport chain.',
+   v: [
+    { type: 'mc', q: 'What roles do NADH and FADH2 play in cellular respiration?', a: 'Electron carriers that bring high-energy electrons to the electron transport chain', d: ['Enzymes that split glucose', 'The final electron acceptors of the ETC', 'Sugars that are burned for energy in the matrix'] },
+    { type: 'fill', q: 'NADH and FADH2 are both ______ carriers.', accept: ['electron', 'electrons', 'e-', 'electron carrier', 'electron carriers', 'hydrogen', 'energy'], answer: 'electron' },
+    { type: 'tf', q: 'True or false: NADH and FADH2 donate electrons to the electron transport chain.', a: true },
+   ] },
+ { id: 28, t: 4, text: "What is oxygen's role in the electron transport chain?",
+   ex: 'Oxygen is the final electron acceptor. At the end of the chain it accepts electrons and H+ to form water. Without O2 the chain backs up and stops.',
+   v: [
+    { type: 'mc', q: "What is oxygen's role in the electron transport chain?", a: 'Final electron acceptor; it combines with electrons and H+ to form water', d: ['It donates electrons at the start of the chain', 'It is broken down to release CO2', 'It pumps protons across the membrane'] },
+    { type: 'fill', q: 'Oxygen is the ______ electron acceptor of the ETC.', accept: ['final', 'last', 'terminal', 'ultimate'], answer: 'final' },
+    { type: 'tf', q: 'True or false: In the ETC, oxygen accepts electrons and hydrogen ions to form water.', a: true },
+   ] },
+ { id: 29, t: 4, text: 'How does chemiosmosis and ATP synthase use a proton gradient to make ATP?',
+   ex: 'The ETC pumps H+ from the matrix into the intermembrane space, building a gradient. H+ flows back down the gradient through ATP synthase, which spins like a turbine and uses that energy to add Pi to ADP (oxidative phosphorylation).',
+   v: [
+    { type: 'mc', q: 'How does ATP synthase use the proton gradient to make ATP?', a: 'H+ flows back into the matrix through ATP synthase, spinning it so it adds Pi to ADP', d: ['ATP synthase pumps H+ out using ATP', 'Protons bond directly to ADP to form ATP', 'Oxygen flows through ATP synthase and splits glucose'] },
+    { type: 'match', q: 'Match each step of chemiosmosis.', pairs: [['ETC proteins', 'Pump H+ into the intermembrane space'], ['H+ flowing back', 'Spins ATP synthase'], ['ATP synthase', 'Joins ADP + Pi into ATP']] },
+    { type: 'tf', q: 'True or false: In chemiosmosis, H+ ions flow down their gradient from the intermembrane space into the matrix through ATP synthase.', a: true },
+   ] },
+ { id: 30, t: 4, text: 'About how many ATP are made from one glucose molecule, and which stage makes the most?',
+   ex: 'About 30-32 ATP per glucose (older textbooks say 36-38). The electron transport chain / oxidative phosphorylation (chemiosmosis) makes the most - about 26-28.',
+   v: [
+    { type: 'mc', q: 'About how many ATP are made per glucose, and which stage makes the most?', a: 'About 30-32 ATP; the electron transport chain (oxidative phosphorylation) makes most', d: ['About 2 ATP; glycolysis makes most', 'About 30-32 ATP; the Krebs cycle makes most', 'About 100 ATP; glycolysis makes most'] },
+    { type: 'mc', q: 'Which stage of cellular respiration makes the most ATP?', a: 'Electron transport chain / oxidative phosphorylation', d: ['Glycolysis', 'Krebs cycle', 'Pyruvate oxidation'] },
+    { type: 'fill', q: 'One glucose yields about ____ ATP (modern estimate; type a number).', accept: ['30', '32', '30-32', '30 to 32', '31', '36', '38', '36-38', 'about 30', 'about 32'], answer: '30-32 (older texts: 36-38)' },
+   ] },
+];
+
+// =====================================================================
+//  CELL QUEST: The ATP Odyssey
+//  A Prodigy-style adventure INSIDE a cell. Every battle move is powered
+//  by answering a biology question. Right answer = the move works.
+//  Wrong answer = it fizzles, you see why, and the enemy gets a turn.
+// =====================================================================
+'use strict';
+
+// ---------- 1. Canvas + screen size (with devicePixelRatio for sharp phones) ----------
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);   // cap at 2 so old phones stay fast
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);            // now we can draw in normal CSS pixels
+}
+window.addEventListener('resize', resize); resize();
+
+// ---------- 2. Little helpers ----------
+const $ = (id) => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+function shuffle(arr) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// Seeded random numbers: same seed = same world every time.
+function makeRng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// ---------- 3. Sound (tiny beeps made with WebAudio, no files) ----------
+const Sound = {
+  ctx: null, muted: false,
+  unlock() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* no audio */ } } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  beep(freq, dur, type = 'square', vol = 0.06) {
+    if (this.muted || !this.ctx) return;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(this.ctx.destination);
+    const t = this.ctx.currentTime; g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur);
+  },
+  good() { this.beep(660, 0.1); setTimeout(() => this.beep(990, 0.15), 90); },
+  bad() { this.beep(200, 0.25, 'sawtooth'); },
+  hit() { this.beep(120, 0.12, 'triangle', 0.1); },
+};
+
+// =====================================================================
+// 4. THE WORLD - 5 regions laid out left to right, separated by membranes.
+// =====================================================================
+const TILE = 32;
+const REG_W = 46, MAP_H = 34, NREG = 5, MAP_W = REG_W * NREG;
+const T = { FLOOR: 0, ORG: 1, MEMB: 2, GATE: 3, POOL: 4, PATH: 5 };   // tile codes
+const REGIONS = [
+  { name: 'Nucleotide Narrows', floor: '#1d3b4f', floor2: '#24485f', org: '#4fb3a9', desc: 'Where ATP molecules are assembled. Learn their parts!' },
+  { name: 'Hydrolysis Hollows', floor: '#1b2f52', floor2: '#213a63', org: '#5a8de0', desc: 'Water splits phosphate bonds here. Energy everywhere!' },
+  { name: 'Cycle Springs', floor: '#2d2350', floor2: '#372b60', org: '#9b6ce0', desc: 'ADP is recharged into ATP in an endless loop.' },
+  { name: 'Motor Protein Works', floor: '#3d2a1e', floor2: '#4a3324', org: '#d88a4a', desc: 'Muscles, pumps and builders all run on ATP.' },
+  { name: 'The Mitochondrion', floor: '#3d1f2a', floor2: '#4a2633', org: '#e05a6f', desc: 'The powerhouse: glycolysis, Krebs, and the ETC.' },
+];
+// The last region is split into 3 zones
+function mitoZone(tx) { const lx = tx - 4 * REG_W; return lx < 15 ? 0 : lx < 30 ? 1 : 2; }
+const MITO_ZONES = ['Glycolysis Plaza (cytoplasm)', 'Krebs Matrix (mitochondrial matrix)', 'Cristae Ridge (inner membrane / ETC)'];
+
+let map = [];   // map[y][x] = tile code
+const GATES = [];
+function buildWorld() {
+  const rng = makeRng(20261024);
+  map = [];
+  for (let y = 0; y < MAP_H; y++) map.push(new Array(MAP_W).fill(T.FLOOR));
+  for (let x = 0; x < MAP_W; x++) { map[0][x] = map[MAP_H - 1][x] = T.MEMB; }
+  for (let y = 0; y < MAP_H; y++) { map[y][0] = map[y][MAP_W - 1] = T.MEMB; }
+  // Organelle blobs (obstacles) and cytosol pools, random but seeded
+  for (let i = 0; i < 210; i++) {
+    const cx = Math.floor(rng() * MAP_W), cy = Math.floor(rng() * MAP_H), r = 1 + rng() * 2.3;
+    const code = rng() < 0.25 ? T.POOL : T.ORG;
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+      if (y > 0 && y < MAP_H - 1 && x > 0 && x < MAP_W - 1 && Math.hypot(x - cx, y - cy) <= r) map[y][x] = code;
+    }
+  }
+  // A winding path through every region so the world is always connected
+  let py = 17;
+  for (let x = 1; x < MAP_W - 1; x++) {
+    if (x % 6 === 0) py = clamp(py + Math.floor(rng() * 5) - 2, 6, MAP_H - 7);
+    for (let dy = -1; dy <= 1; dy++) map[py + dy][x] = T.PATH;
+  }
+  // Clear vertical lanes so every area can be reached
+  for (let r = 0; r < NREG; r++) for (const lx of [8, 22, 36]) {
+    const x = r * REG_W + lx;
+    for (let y = 1; y < MAP_H - 1; y++) if (map[y][x] !== T.PATH) map[y][x] = T.FLOOR;
+  }
+  // Membranes between regions, each with a 3-tile gate where the path crosses
+  for (let r = 1; r < NREG; r++) {
+    const x = r * REG_W;
+    let gy = -1;
+    for (let y = 1; y < MAP_H - 1; y++) { if (map[y][x] === T.PATH && gy < 0) gy = y; map[y][x] = T.MEMB; map[y][x + 1] = T.MEMB; }
+    for (let dy = 0; dy < 3; dy++) { map[gy + dy][x] = T.GATE; map[gy + dy][x + 1] = T.GATE; }
+    GATES[r] = { x, y: gy };
+  }
+  // Inside the mitochondrion: outer and inner membrane folds with openings
+  const mx = 4 * REG_W;
+  for (let y = 1; y < MAP_H - 1; y++) {
+    if (map[y][mx + 15] !== T.PATH && y % 9 !== 4 && y % 9 !== 5) map[y][mx + 15] = T.MEMB;
+    if (map[y][mx + 30] !== T.PATH && y % 7 !== 2 && y % 7 !== 3) map[y][mx + 30] = T.MEMB;
+  }
+}
+function tileAt(tx, ty) { if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return T.MEMB; return map[ty][tx]; }
+function gateRegion(tx) { return Math.round(tx / REG_W); }
+function solid(tx, ty) {
+  const t = tileAt(tx, ty);
+  if (t === T.ORG || t === T.MEMB) return true;   // pools (POOL) are shallow - you can wade through them
+  if (t === T.GATE) return !game.save.bosses[gateRegion(tx) - 1];
+  return false;
+}
+function regionOf(px) { return clamp(Math.floor(px / TILE / REG_W), 0, NREG - 1); }
+// Find the nearest open floor tile (used to place NPCs)
+function openSpot(tx, ty) {
+  for (let r = 0; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const x = tx + dx, y = ty + dy, t = tileAt(x, y);
+    if (t === T.FLOOR || t === T.PATH) return { x, y };
+  }
+  return { x: tx, y: ty };
+}
+
+// =====================================================================
+// 5. CREATURES - each species asks its own favourite questions (q).
+//    kind = the bonus it gives when it is your companion.
+// =====================================================================
+const SPECIES = {
+  phosphopup:  { name: 'Phospho Pup', r: 0, color: '#ffd166', shape: 'blob', hp: 26, atk: 6, q: [4, 5], kind: 'atk', lore: 'A bouncy phosphate group. Three of them together are very grumpy (they repel!).' },
+  ribosprite:  { name: 'Ribosprite', r: 0, color: '#7ff0de', shape: 'ring', hp: 24, atk: 5, q: [1, 2], kind: 'heal', lore: 'A five-carbon sugar ring that loves RNA and ATP.' },
+  adenimp:     { name: 'Adenimp', r: 0, color: '#8ecae6', shape: 'spiky', hp: 28, atk: 6, q: [1, 3], kind: 'def', lore: 'A tiny purine imp: the "A" in ATP.' },
+  hydrodrip:   { name: 'Hydro Drip', r: 1, color: '#9cc4ff', shape: 'drop', hp: 34, atk: 8, q: [7, 8], kind: 'heal', lore: 'A water molecule that splits bonds for fun (hydrolysis).' },
+  bondbreaker: { name: 'Bond Breaker', r: 1, color: '#ff9f68', shape: 'spiky', hp: 38, atk: 9, q: [6, 9], kind: 'atk', lore: 'Snaps the terminal phosphate bond and releases energy.' },
+  gibbsgoblin: { name: 'Gibbs Goblin', r: 1, color: '#c3f584', shape: 'blob', hp: 36, atk: 8, q: [10, 11, 12], kind: 'def', lore: 'Measures delta G obsessively. Prefers cellular conditions.' },
+  cyclosnail:  { name: 'Cyclo Snail', r: 2, color: '#d2b4ff', shape: 'ring', hp: 44, atk: 10, q: [16, 13], kind: 'def', lore: 'Goes round and round: ATP to ADP and back again.' },
+  kinasekit:   { name: 'Kinase Kit', r: 2, color: '#f7a8d8', shape: 'blob', hp: 42, atk: 11, q: [17, 18], kind: 'atk', lore: 'A fox-like enzyme that sticks phosphates onto things.' },
+  pirate:      { name: 'Pi-Rate', r: 2, color: '#ffe66d', shape: 'spiky', hp: 46, atk: 10, q: [13, 14, 15], kind: 'heal', lore: 'Steals free phosphates (Pi) to recharge ADP.' },
+  myosinmite:  { name: 'Myosin Mite', r: 3, color: '#ff8c8c', shape: 'spiky', hp: 54, atk: 12, q: [20, 19], kind: 'atk', lore: 'Pulls on actin with every ATP it burns.' },
+  kinesin:     { name: 'Kinesin Walker', r: 3, color: '#ffc58c', shape: 'walker', hp: 50, atk: 12, q: [20, 22], kind: 'def', lore: 'Walks cargo along microtubules, one ATP per step.' },
+  pumpling:    { name: 'Pumpling', r: 3, color: '#80ed99', shape: 'blob', hp: 56, atk: 13, q: [21, 19, 22], kind: 'heal', lore: 'A baby sodium-potassium pump: 3 Na+ out, 2 K+ in.' },
+  pyruvite:    { name: 'Pyruvite', r: 4, color: '#ffd6a5', shape: 'blob', hp: 62, atk: 14, q: [23, 24], kind: 'heal', lore: 'Half a glucose, fresh from glycolysis in the cytoplasm.' },
+  krebsling:   { name: 'Krebsling', r: 4, color: '#ffadad', shape: 'ring', hp: 66, atk: 15, q: [25, 27], kind: 'atk', lore: 'Spins the citric acid cycle in the matrix.' },
+  nadhawk:     { name: 'NADHawk', r: 4, color: '#a0c4ff', shape: 'drop', hp: 64, atk: 15, q: [27, 26, 28], kind: 'def', lore: 'An electron carrier that delivers to the ETC.' },
+  protonpixie: { name: 'Proton Pixie', r: 4, color: '#fdffb6', shape: 'spiky', hp: 60, atk: 16, q: [29, 30, 28], kind: 'atk', lore: 'An H+ ion zooming down its gradient.' },
+};
+const ZONE_SPECIES = [['phosphopup', 'ribosprite', 'adenimp'], ['hydrodrip', 'bondbreaker', 'gibbsgoblin'], ['cyclosnail', 'kinasekit', 'pirate'], ['myosinmite', 'kinesin', 'pumpling'], ['pyruvite', 'krebsling', 'nadhawk', 'protonpixie']];
+const BOSSES = [
+  { name: 'Triphos the Tri-Tail', color: '#ffb703', shape: 'boss', hp: 90, atk: 10, q: [1, 2, 3, 4, 5], lore: 'Three phosphate tails, all repelling each other.' },
+  { name: 'Hydrolyzer Hydra', color: '#4cc9f0', shape: 'boss', hp: 130, atk: 13, q: [6, 7, 8, 9, 10, 11, 12], lore: 'Each head splits ATP with water.' },
+  { name: 'The Great Recharger', color: '#b388ff', shape: 'boss', hp: 170, atk: 16, q: [13, 14, 15, 16, 17, 18], lore: 'Couples reactions to turn ADP back into ATP.' },
+  { name: 'Sodium-Potassium Colossus', color: '#ff7b54', shape: 'boss', hp: 210, atk: 19, q: [19, 20, 21, 22], lore: 'A giant pump that moves ions against their gradients.' },
+  { name: 'ATP SYNTHASE', color: '#ff4d6d', shape: 'synthase', hp: 300, atk: 22, q: [23, 24, 25, 26, 27, 28, 29, 30], lore: 'The rotary turbine of the inner membrane. Final boss!' },
+];
+
+// =====================================================================
+// 6. SAVE DATA - everything that survives closing the page (localStorage)
+// =====================================================================
+const SAVE_KEY = 'cellQuestSave_v1';
+function newSave() {
+  return {
+    x: 5 * TILE, y: 17 * TILE, hp: 60, lvl: 1, xp: 0, coins: 30, potions: 2, superPotions: 0,
+    gear: { atk: 0, def: 0, boots: false, charm: false }, owned: [],
+    bosses: [false, false, false, false, false],
+    stats: {},         // stats[questionId] = { box, seen, right, wrong, lastSeen, due, varSeen }
+    party: [], companion: null, wins: [0, 0, 0, 0, 0], friends: [0, 0, 0, 0, 0],
+    quests: {},        // quests[id] = 'active' | 'done'
+    turn: 0,           // counts every answer (spaced repetition uses it as a clock)
+    bestStreak: 0, ended: false, checkpoint: null,
+  };
+}
+function saveGame() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(game.save)); } catch (e) { /* private mode */ } }
+function loadGame() {
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.stats) return Object.assign(newSave(), s); } catch (e) { /* bad save */ }
+  return null;
+}
+
+// =====================================================================
+// 7. GAME STATE
+// =====================================================================
+const game = {
+  state: 'title',      // 'title' | 'play' | 'battle' | 'end'
+  save: newSave(), panel: null, touchMode: false, time: 0,
+  creatures: [], npcs: [], particles: [], toast: null, toastT: 0,
+  battle: null, cam: { x: 0, y: 0 }, streak: 0, curQ: null, walkAnim: 0, face: 1,
+};
+function maxHp() { return 60 + (game.save.lvl - 1) * 12; }
+function atkPow() { return 10 + (game.save.lvl - 1) * 3 + game.save.gear.atk + compBonus('atk'); }
+function defPow() { return (game.save.lvl - 1) + game.save.gear.def + compBonus('def'); }
+function compBonus(kind) { const c = game.save.companion; if (!c || !SPECIES[c] || SPECIES[c].kind !== kind) return 0; return kind === 'heal' ? 8 : 4; }
+function xpNeed() { return 30 + game.save.lvl * 20; }
+function toast(msg) { game.toast = msg; game.toastT = 3.2; }
+
+// =====================================================================
+// 8. SPACED REPETITION + MASTERY (a "Leitner box" system)
+//    Each question has a box from 0 to 5.
+//    Right answer: box goes up 1 and the question waits longer to return.
+//    Wrong answer: box drops 2 and the question comes back within ~2 answers.
+//    A question is MASTERED at box 3 (3 stars).
+// =====================================================================
+const MASTER_BOX = 3;
+function qStat(id) {
+  const s = game.save.stats;
+  if (!s[id]) s[id] = { box: 0, seen: 0, right: 0, wrong: 0, lastSeen: -99, due: 0, varSeen: [] };
+  return s[id];
+}
+function qMastery(id) { return Math.min(qStat(id).box, MASTER_BOX) / MASTER_BOX; }
+function topicMastery(t) { const qs = QUESTIONS.filter((q) => q.t === t); return qs.reduce((a, q) => a + qMastery(q.id), 0) / qs.length; }
+function totalMastery() { return QUESTIONS.reduce((a, q) => a + qMastery(q.id), 0) / QUESTIONS.length; }
+function allMastered() { return QUESTIONS.every((q) => qStat(q.id).box >= MASTER_BOX); }
+
+// Pick the next question from a pool of ids, favouring weak and overdue ones.
+function chooseQuestion(pool) {
+  const turn = game.save.turn;
+  let best = null, bestW = -1;
+  for (const id of pool) {
+    const s = qStat(id);
+    let w = (6 - s.box) * (6 - s.box) + 1;              // weak questions weigh more
+    if (s.wrong > 0 && s.box < MASTER_BOX && turn >= s.due) w += 40;  // a missed question that is due comes back hard
+    else if (turn < s.due) w *= 0.4;                     // not due yet: less likely
+    if (turn - s.lastSeen < 2 && pool.length > 2) w *= 0.05; // don't repeat the same one right away
+    w *= rand(0.6, 1.4);                                 // a bit of randomness
+    if (w > bestW) { bestW = w; best = id; }
+  }
+  return QUESTIONS.find((q) => q.id === best);
+}
+// Choose the wording he has seen least, so he learns the idea, not one sentence.
+function chooseVariant(q) {
+  const s = qStat(q.id);
+  while (s.varSeen.length < q.v.length) s.varSeen.push(0);
+  const min = Math.min(...s.varSeen);
+  const options = q.v.map((v, i) => i).filter((i) => s.varSeen[i] === min);
+  const vi = pick(options); s.varSeen[vi]++;
+  return { vi, v: q.v[vi] };
+}
+function recordAnswer(q, correct) {
+  const s = qStat(q.id), sv = game.save;
+  sv.turn++; s.seen++; s.lastSeen = sv.turn;
+  if (correct) { s.right++; s.box = Math.min(5, s.box + 1); s.due = sv.turn + 4 * s.box; }
+  else { s.wrong++; s.box = Math.max(0, s.box - 2); s.due = sv.turn + 2; }
+}
+
+// Fill-in checker: forgiving about capitals, spaces and punctuation.
+function norm(t) { return String(t).toLowerCase().replace(/[^a-z0-9.+\- ]/g, '').replace(/\s+/g, ' ').trim(); }
+function checkFill(input, accept) {
+  const n = norm(input); if (!n) return false;
+  return accept.some((a) => { const na = norm(a); return n === na || (na.length >= 4 && n.split(' ').includes(na)) || (na.length >= 6 && n.includes(na)); });
+}
+
+// =====================================================================
+// 9. QUESTION SCREEN (an HTML overlay, so phones get a real keyboard)
+// =====================================================================
+const qBox = $('qbox');
+function askQuestion(pool, actionLabel, onDone) {
+  const q = chooseQuestion(pool);
+  const { vi, v } = chooseVariant(q);
+  const cur = { q, v, vi, onDone, answered: false, choices: null };
+  game.curQ = cur;
+  let html = `<div class="qtag">${esc(actionLabel)} &middot; ${esc(TOPICS[q.t].name)} &middot; Q${q.id}${game.streak >= 2 ? ` &middot; <b class="streak">STREAK x${game.streak}</b>` : ''}</div>`;
+  html += `<div class="qtext">${esc(v.q)}</div><div class="qans">`;
+  if (v.type === 'mc') {
+    cur.choices = shuffle([v.a, ...v.d]);
+    if (game.save.gear.charm && game.battle && !game.battle.charmUsed) {  // Codon Charm: one wrong choice removed, once per battle
+      game.battle.charmUsed = true; const wrong = cur.choices.find((c) => c !== v.a); cur.choices = cur.choices.filter((c) => c !== wrong);
+    }
+    cur.choices.forEach((c, i) => { html += `<button class="choice" data-i="${i}"><span class="num">${i + 1}</span>${esc(c)}</button>`; });
+  } else if (v.type === 'tf') {
+    cur.choices = [true, false];
+    html += `<button class="choice" data-i="0"><span class="num">1</span>TRUE</button><button class="choice" data-i="1"><span class="num">2</span>FALSE</button>`;
+  } else if (v.type === 'fill') {
+    html += `<input id="fillin" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type your answer..."><button class="choice submit" id="fillgo">Submit (Enter)</button>`;
+  } else if (v.type === 'match') {
+    cur.rights = shuffle(v.pairs.map((p) => p[1]));
+    v.pairs.forEach((p, i) => {
+      html += `<div class="mrow"><span>${esc(p[0])}</span><select data-i="${i}"><option value="">-- choose --</option>${cur.rights.map((r) => `<option>${esc(r)}</option>`).join('')}</select></div>`;
+    });
+    html += `<button class="choice submit" id="matchgo">Lock in matches</button>`;
+  }
+  html += '</div><div id="qfeedback"></div>';
+  qBox.innerHTML = html; qBox.style.display = 'block'; qBox.scrollTop = 0;
+  qBox.querySelectorAll('.choice[data-i]').forEach((b) => b.addEventListener('click', () => submitChoice(+b.dataset.i)));
+  const go = $('fillgo');
+  if (go) { go.addEventListener('click', submitFill); const inp = $('fillin'); inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitFill(); } }); if (!game.touchMode) setTimeout(() => inp.focus(), 50); }
+  const mg = $('matchgo'); if (mg) mg.addEventListener('click', submitMatch);
+}
+function submitChoice(i) {
+  const cur = game.curQ; if (!cur || cur.answered || !cur.choices || i < 0 || i >= cur.choices.length) return;
+  const correct = cur.choices[i] === cur.v.a;
+  qBox.querySelectorAll('.choice[data-i]').forEach((b) => { const k = +b.dataset.i; if (cur.choices[k] === cur.v.a) b.classList.add('right'); else if (k === i) b.classList.add('wrong'); b.disabled = true; });
+  finishAnswer(correct, cur.v.type === 'tf' ? (cur.v.a ? 'TRUE' : 'FALSE') : cur.v.a);
+}
+function submitFill() {
+  const cur = game.curQ; if (!cur || cur.answered) return;
+  const val = $('fillin').value; if (!val.trim()) return;
+  $('fillin').disabled = true; $('fillgo').disabled = true;
+  finishAnswer(checkFill(val, cur.v.accept), cur.v.answer);
+}
+function submitMatch() {
+  const cur = game.curQ; if (!cur || cur.answered) return;
+  const sels = [...qBox.querySelectorAll('select')];
+  if (sels.some((s) => !s.value)) { $('qfeedback').innerHTML = '<div class="hint">Pick a match for every row first.</div>'; return; }
+  let ok = true;
+  sels.forEach((s) => { const good = s.value === cur.v.pairs[+s.dataset.i][1]; s.classList.add(good ? 'right' : 'wrong'); s.disabled = true; if (!good) ok = false; });
+  $('matchgo').disabled = true;
+  finishAnswer(ok, cur.v.pairs.map((p) => `${p[0]} = ${p[1]}`).join('; '));
+}
+function finishAnswer(correct, shownAnswer) {
+  const cur = game.curQ; cur.answered = true; cur.correct = correct;
+  recordAnswer(cur.q, correct);
+  if (correct) { game.streak++; game.save.bestStreak = Math.max(game.save.bestStreak, game.streak); Sound.good(); } else { game.streak = 0; Sound.bad(); }
+  const box = Math.min(qStat(cur.q.id).box, 3);
+  $('qfeedback').innerHTML = `<div class="fb ${correct ? 'ok' : 'no'}"><b>${correct ? 'CORRECT! The move works!' : 'NOT QUITE - the move fizzles!'}</b>` +
+    `<div><b>Answer:</b> ${esc(shownAnswer)}</div><div class="why">${esc(cur.q.ex)}</div>` +
+    `<div class="mast">Mastery of Q${cur.q.id}: ${'&#9733;'.repeat(box)}${'&#9734;'.repeat(3 - box)}${correct ? '' : ' &middot; this one will come back soon'}</div></div>` +
+    `<button class="choice submit" id="qcontinue">Continue (Enter)</button>`;
+  $('qcontinue').addEventListener('click', closeQuestion);
+  $('qfeedback').scrollIntoView({ block: 'nearest' });
+  saveGame();
+}
+function closeQuestion() {
+  const cur = game.curQ; if (!cur || !cur.answered) return;
+  qBox.style.display = 'none'; qBox.innerHTML = ''; game.curQ = null;
+  grabFocus();
+  cur.onDone(cur.correct);
+}
+
+
+// =====================================================================
+// 10. NPCs + QUESTS
+// =====================================================================
+const QUESTS = [
+  { id: 'q0a', r: 0, title: 'First Contact', text: 'Win 2 battles in Nucleotide Narrows.', need: (s) => s.wins[0] >= 2, reward: 20 },
+  { id: 'q0b', r: 0, title: 'A New Friend', text: 'Befriend a creature (use BEFRIEND when it is weak).', need: (s) => s.party.length >= 1, reward: 25 },
+  { id: 'q1a', r: 1, title: 'Splitting Hairs', text: 'Win 3 battles in Hydrolysis Hollows.', need: (s) => s.wins[1] >= 3, reward: 30 },
+  { id: 'q1b', r: 1, title: 'Know Your Delta G', text: 'Master Q10 and Q11 (3 stars each).', need: () => qStat(10).box >= 3 && qStat(11).box >= 3, reward: 40 },
+  { id: 'q2a', r: 2, title: 'Round and Round', text: 'Win 3 battles in Cycle Springs.', need: (s) => s.wins[2] >= 3, reward: 40 },
+  { id: 'q2b', r: 2, title: 'Coupling Expert', text: 'Master Q18 (energy coupling).', need: () => qStat(18).box >= 3, reward: 50 },
+  { id: 'q3a', r: 3, title: 'Put It to Work', text: 'Befriend a creature from the Motor Protein Works.', need: (s) => s.friends[3] >= 1, reward: 50 },
+  { id: 'q3b', r: 3, title: 'Pump It Up', text: 'Master Q21 (sodium-potassium pump).', need: () => qStat(21).box >= 3, reward: 50 },
+  { id: 'q4a', r: 4, title: 'Powerhouse Patrol', text: 'Win 4 battles inside the Mitochondrion.', need: (s) => s.wins[4] >= 4, reward: 60 },
+  { id: 'q4b', r: 4, title: 'Collector', text: 'Have 6 creatures in your party.', need: (s) => s.party.length >= 6, reward: 80 },
+];
+const BOSS_MASTERY = 0.5;   // you need 50% topic mastery before a region boss will fight you
+const GUIDES = [
+  { name: 'Professor Ribo', look: '#7ff0de', lines: ['Creatures here only respect explorers who KNOW their biology. Every move in battle needs a right answer.', 'Get your ATP Structure mastery to 50% and the guardian Triphos will accept your challenge. Beat it and the membrane gate opens!'] },
+  { name: 'Hydra Hal', look: '#9cc4ff', lines: ['Down here, water breaks bonds. That is hydrolysis!', 'Standard conditions: about -7.3 kcal/mol. Inside a cell: about -13. Why? The cell keeps ATP way higher than ADP.'] },
+  { name: 'Cycla', look: '#d2b4ff', lines: ['ATP is not a battery you throw away. It recharges! ADP + Pi + energy -> ATP.', 'Energy coupling is the trick: pair an exergonic reaction with an endergonic one.'] },
+  { name: 'Foreman Myo', look: '#ffc58c', lines: ['Welcome to the Works! Mechanical, transport, chemical - all three kinds of work run on ATP.', 'The Colossus pumps 3 sodium out and 2 potassium in for every ATP. Respect the pump.'] },
+  { name: 'Dr. Mito', look: '#ff9fb0', lines: ['The powerhouse! Glycolysis really happens out in the cytoplasm, the Krebs cycle in the matrix, and the ETC on the inner membrane.', 'At the far end of Cristae Ridge spins ATP SYNTHASE. Beat it... then master EVERYTHING to restore the cell.'] },
+];
+const LORE_NAMES = ['Old Nucleotide', 'Drip the Elder', 'Kinase Kat', 'Retired Myosin', 'Cytochrome C'];
+const LORE_Q = [5, 12, 18, 21, 29];   // the trickiest idea in each region, taught by a wise NPC
+function buildNpcs() {
+  game.npcs = [];
+  for (let r = 0; r < NREG; r++) {
+    const bx = r * REG_W;
+    const add = (o, tx, ty) => { const p = openSpot(tx, ty); game.npcs.push(Object.assign({ r, x: p.x * TILE + 16, y: p.y * TILE + 16 }, o)); };
+    add({ type: 'guide', ...GUIDES[r] }, bx + 6, 15);
+    add({ type: 'healer', name: 'Chaperone Nurse', look: '#ffffff' }, bx + 4, 21);
+    if (r === 0 || r === 2 || r === 4) add({ type: 'shop', name: 'Golgi Merchant', look: '#ffd166' }, bx + 11, 13);
+    const gy = r < NREG - 1 ? GATES[r + 1].y + 1 : 17;
+    add({ type: 'boss', name: BOSSES[r].name, look: BOSSES[r].color }, bx + REG_W - 4, gy);
+    const lq = QUESTIONS.find((q) => q.id === LORE_Q[r]);
+    add({ type: 'lore', name: LORE_NAMES[r], look: '#c0c0ff', lines: ['Let me tell you a secret about ' + TOPICS[r].name + '...', lq.text, lq.ex] }, bx + 26, 8);
+  }
+  // Final NPC: gives the ending once everything is mastered
+  const p = openSpot(MAP_W - 4, 6);
+  game.npcs.push({ type: 'core', r: 4, name: 'Nucleus Hologram', look: '#ffffff', x: p.x * TILE + 16, y: p.y * TILE + 16 });
+}
+function spawnCreatures() {
+  game.creatures = [];
+  const rng = makeRng(777);
+  for (let r = 0; r < NREG; r++) {
+    for (let i = 0; i < 10; i++) {
+      let tx, ty, tries = 0;
+      do { tx = r * REG_W + 4 + Math.floor(rng() * (REG_W - 8)); ty = 2 + Math.floor(rng() * (MAP_H - 4)); tries++; }
+      while ((solid(tx, ty) || tileAt(tx, ty) === T.GATE || (r === 0 && tx < 14)) && tries < 300);
+      const sp = r === 4 ? ZONE_SPECIES[4][Math.min(3, mitoZone(tx) + (rng() < 0.4 ? 1 : 0))] : ZONE_SPECIES[r][Math.floor(rng() * 3)];
+      game.creatures.push({ sp, r, x: tx * TILE + 16, y: ty * TILE + 16, hx: tx * TILE + 16, hy: ty * TILE + 16, vx: 0, vy: 0, t: rng() * 3, alive: true, respawn: 0, cool: 0, lvl: r * 3 + 1 + Math.floor(rng() * 3) });
+    }
+  }
+}
+function talkTo(npc) {
+  const s = game.save;
+  if (npc.type === 'guide') {
+    const lines = npc.lines.slice();
+    for (const q of QUESTS.filter((q) => q.r === npc.r)) {
+      if (!s.quests[q.id]) { s.quests[q.id] = 'active'; lines.push(`NEW QUEST - ${q.title}: ${q.text}`); }
+      else if (s.quests[q.id] === 'active' && q.need(s)) { s.quests[q.id] = 'done'; s.coins += q.reward; lines.push(`Quest complete: ${q.title}! +${q.reward} glucose.`); Sound.good(); }
+      else if (s.quests[q.id] === 'active') lines.push(`Still working on "${q.title}": ${q.text}`);
+    }
+    lines.push(`${TOPICS[npc.r].name} mastery: ${Math.round(topicMastery(npc.r) * 100)}%. The boss needs ${BOSS_MASTERY * 100}%.`);
+    saveGame(); dialog(npc.name, lines);
+  } else if (npc.type === 'healer') {
+    s.hp = maxHp(); s.checkpoint = { x: s.x, y: s.y }; saveGame();
+    dialog(npc.name, ['You are fully healed, and your progress is saved here.', 'Fun fact: chaperone proteins help other proteins fold - and many use ATP to do it!']);
+  } else if (npc.type === 'shop') openShop();
+  else if (npc.type === 'lore') dialog(npc.name, npc.lines);
+  else if (npc.type === 'boss') {
+    if (s.bosses[npc.r]) { dialog(npc.name, [npc.r === 4 ? 'The turbine spins happily for you now. Go see the Nucleus Hologram!' : 'You beat me fair and square. The gate is open - go on!']); return; }
+    const m = topicMastery(npc.r);
+    if (m < BOSS_MASTERY) { dialog(npc.name, [`${BOSSES[npc.r].name}: You are not ready! Come back when your ${TOPICS[npc.r].name} mastery is at least ${BOSS_MASTERY * 100}% (now ${Math.round(m * 100)}%).`, 'Battle creatures in this region to practice. The Codex (C) shows which questions are weak.']); return; }
+    dialog(npc.name, [`${BOSSES[npc.r].name}: So you think you know ${TOPICS[npc.r].name}? Prove it!`], () => startBattle({ boss: npc.r }));
+  } else if (npc.type === 'core') {
+    if (!s.bosses[4]) { dialog(npc.name, ['The cell is starving for energy. Defeat ATP SYNTHASE first.']); return; }
+    if (!allMastered()) { const left = QUESTIONS.filter((q) => qStat(q.id).box < MASTER_BOX).map((q) => 'Q' + q.id); dialog(npc.name, [`Almost there! To restore the cell you must master all 30 questions (3 stars). Still to master: ${left.join(', ')}.`, 'Battle creatures anywhere to practice. Missed questions come back more often.']); return; }
+    showEnding();
+  }
+}
+
+// =====================================================================
+// 11. DIALOG, SHOP, CODEX panels (HTML overlays)
+// =====================================================================
+const panel = $('panel');
+function openPanel(html, name) { panel.innerHTML = html; panel.style.display = 'block'; panel.scrollTop = 0; game.panel = name; const c = panel.querySelector('.close'); if (c) c.addEventListener('click', closePanel); updateTouchUI(); }
+function closePanel() { panel.style.display = 'none'; panel.innerHTML = ''; const cb = game.panelDone; game.panel = null; game.panelDone = null; updateTouchUI(); grabFocus(); if (cb) cb(); }
+function dialog(name, lines, onDone) {
+  let i = 0;
+  const show = () => {
+    openPanel(`<div class="dlg"><div class="who">${esc(name)}</div><div class="say">${esc(lines[i])}</div><button class="choice submit" id="dnext">${i < lines.length - 1 ? 'Next (E)' : 'OK (E)'}</button></div>`, 'dialog');
+    $('dnext').addEventListener('click', () => { i++; if (i < lines.length) show(); else { game.panelDone = onDone; closePanel(); } });
+  };
+  show();
+}
+const SHOP = [
+  { id: 'potion', name: 'ATP Potion', desc: 'Heals 40 HP (used by the HEAL move).', cost: 15, buy: (s) => s.potions++ },
+  { id: 'super', name: 'Super ATP Potion', desc: 'Heals 100 HP.', cost: 40, buy: (s) => s.superPotions++ },
+  { id: 'blade1', name: 'Enzyme Blade', desc: '+4 attack.', cost: 60, once: true, buy: (s) => { s.gear.atk += 4; } },
+  { id: 'blade2', name: 'Catalytic Saber', desc: '+8 attack.', cost: 160, once: true, buy: (s) => { s.gear.atk += 8; } },
+  { id: 'shield1', name: 'Phospholipid Shield', desc: '+3 defense.', cost: 60, once: true, buy: (s) => { s.gear.def += 3; } },
+  { id: 'shield2', name: 'Cholesterol Armor', desc: '+6 defense.', cost: 160, once: true, buy: (s) => { s.gear.def += 6; } },
+  { id: 'boots', name: 'Flagella Boots', desc: 'Move 35% faster.', cost: 80, once: true, buy: (s) => { s.gear.boots = true; } },
+  { id: 'charm', name: 'Codon Charm', desc: 'Removes one wrong choice from the first multiple-choice question in each battle.', cost: 120, once: true, buy: (s) => { s.gear.charm = true; } },
+];
+function openShop() {
+  const s = game.save;
+  let html = `<div class="ptitle">Golgi Merchant <span class="coins">${s.coins} glucose</span><button class="close">X</button></div><div class="plist">`;
+  SHOP.forEach((it) => {
+    const owned = it.once && s.owned.includes(it.id);
+    html += `<div class="item"><div><b>${esc(it.name)}</b><br><small>${esc(it.desc)}</small></div><button class="buy" data-id="${it.id}" ${owned || s.coins < it.cost ? 'disabled' : ''}>${owned ? 'Owned' : it.cost + 'g'}</button></div>`;
+  });
+  html += `</div><div class="small">Potions: ${s.potions} &middot; Super: ${s.superPotions}. Win battles to earn glucose - answer streaks earn bonus glucose!</div>`;
+  openPanel(html, 'shop');
+  panel.querySelectorAll('.buy').forEach((b) => b.addEventListener('click', () => {
+    const it = SHOP.find((x) => x.id === b.dataset.id);
+    if (s.coins < it.cost) return;
+    s.coins -= it.cost; it.buy(s); if (it.once) s.owned.push(it.id); Sound.good(); saveGame(); openShop();
+  }));
+}
+function stars(id) { const b = Math.min(qStat(id).box, 3); return '&#9733;'.repeat(b) + '&#9734;'.repeat(3 - b); }
+function openCodex(tab) {
+  tab = tab || 'q';
+  const s = game.save;
+  let html = `<div class="ptitle">Codex &middot; Mastery ${Math.round(totalMastery() * 100)}%<button class="close">X</button></div>` +
+    `<div class="tabs"><button data-t="q" class="${tab === 'q' ? 'on' : ''}">Questions</button><button data-t="c" class="${tab === 'c' ? 'on' : ''}">Creatures (${s.party.length}/${Object.keys(SPECIES).length})</button><button data-t="j" class="${tab === 'j' ? 'on' : ''}">Quests</button></div><div class="plist">`;
+  if (tab === 'q') {
+    TOPICS.forEach((tp) => {
+      const m = Math.round(topicMastery(tp.id) * 100);
+      html += `<div class="topic"><b>${esc(tp.name)}</b> <span class="bar"><i style="width:${m}%"></i></span> ${m}%</div>`;
+      QUESTIONS.filter((q) => q.t === tp.id).forEach((q) => {
+        const st = qStat(q.id);
+        html += `<details class="qrow"><summary><span class="st">${stars(q.id)}</span> Q${q.id}. ${esc(q.text)}</summary>` +
+          (st.seen ? `<div class="why"><b>Answer:</b> ${esc(q.ex)}</div><small>Seen ${st.seen} &middot; right ${st.right} &middot; wrong ${st.wrong}</small>` : '<div class="why">Not seen yet - meet this question in battle to unlock its notes.</div>') + '</details>';
+      });
+    });
+  } else if (tab === 'c') {
+    html += `<div class="small">Befriended creatures can be your companion. Companions give a bonus (attack, defense or healing).</div>`;
+    Object.entries(SPECIES).forEach(([key, sp]) => {
+      const have = s.party.includes(key);
+      html += `<div class="item ${have ? '' : 'locked'}"><canvas class="mini" data-sp="${key}" width="48" height="48"></canvas><div class="grow"><b>${have ? esc(sp.name) : '???'}</b> <small>${esc(REGIONS[sp.r].name)}</small><br><small>${have ? esc(sp.lore) + ' Bonus: ' + { atk: '+4 attack', def: '+4 defense', heal: '+8 healing' }[sp.kind] : 'Not befriended yet.'}</small></div>` +
+        (have ? `<button class="buy comp" data-sp="${key}">${s.companion === key ? 'Active' : 'Choose'}</button>` : '') + '</div>';
+    });
+  } else {
+    QUESTS.forEach((q) => { const st = s.quests[q.id]; if (!st) return; html += `<div class="item"><div><b>${esc(q.title)}</b> ${st === 'done' ? '&#10004;' : (q.need(s) ? '(ready - talk to the guide!)' : '')}<br><small>${esc(q.text)}</small></div></div>`; });
+    html += `<div class="small">MAIN QUEST: beat each region's guardian (needs ${BOSS_MASTERY * 100}% topic mastery), defeat ATP SYNTHASE, then master all 30 questions.<br>Guardians beaten: ${s.bosses.filter(Boolean).length}/5 &middot; Best streak: ${s.bestStreak} &middot; Level ${s.lvl}</small>`;
+  }
+  html += '</div>';
+  openPanel(html, 'codex');
+  panel.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => openCodex(b.dataset.t)));
+  panel.querySelectorAll('.comp').forEach((b) => b.addEventListener('click', () => { s.companion = b.dataset.sp; saveGame(); openCodex('c'); }));
+  panel.querySelectorAll('canvas.mini').forEach((c) => { const sp = SPECIES[c.dataset.sp]; drawCreature(c.getContext('2d'), 24, 22, 0.6, s.party.includes(c.dataset.sp) ? sp.color : '#444', sp.shape, 0); });
+}
+
+// =====================================================================
+// 12. BATTLE SYSTEM - every action needs a correct answer
+// =====================================================================
+// Every move costs ATP (battle energy). A WRONG answer still spends the ATP
+// and ends your turn - so think before you answer!
+const MAX_ATP = 10;    // most ATP you can hold
+const START_ATP = 6;   // ATP at the start of a battle
+const ATP_REGEN = 2;   // ATP you regain at the start of each of your turns
+// Balance knobs (checked by tests/balance.js): ~65% right answers wins, guessing loses.
+const ENEMY_POWER = 1.6;  // enemies hit harder, so losing turns really hurts
+const CREATURE_HP = 1.8;  // wild creatures are tougher (bosses keep their HP)
+const ACTIONS = [
+  { id: 'attack', label: 'Attack', key: 1, cost: 1, desc: 'Strike! Streaks hit harder.' },
+  { id: 'special', label: 'ATP Burst', key: 2, cost: 5, desc: 'Huge hit.' },
+  { id: 'heal', label: 'Heal', key: 3, cost: 3, desc: 'Drink a potion (or regenerate).' },
+  { id: 'defend', label: 'Defend', key: 4, cost: 2, desc: 'Halve the next hit.' },
+  { id: 'befriend', label: 'Befriend', key: 5, cost: 3, desc: 'Sure to work below 50% HP.' },
+  { id: 'flee', label: 'Flee', key: 6, cost: 2, desc: 'Escape (not from bosses).' },
+];
+function actionCost(id) { return ACTIONS.find((a) => a.id === id).cost; }
+function startBattle(opt) {
+  const s = game.save;
+  let e;
+  if (opt.boss !== undefined) {
+    const b = BOSSES[opt.boss];
+    e = { name: b.name, color: b.color, shape: b.shape, hp: b.hp, maxHp: b.hp, atk: b.atk, q: b.q, pool: b.q, boss: opt.boss, r: opt.boss, lvl: opt.boss * 3 + 4 };
+  } else {
+    const sp = SPECIES[opt.c.sp], lv = opt.c.lvl;
+    e = { name: sp.name, key: opt.c.sp, color: sp.color, shape: sp.shape, hp: Math.round((sp.hp + lv * 3) * CREATURE_HP), maxHp: Math.round((sp.hp + lv * 3) * CREATURE_HP), atk: sp.atk + Math.floor(lv / 2), q: sp.q, r: sp.r, lvl: lv, ent: opt.c,
+      pool: QUESTIONS.filter((q) => q.t === sp.r).map((q) => q.id) };
+  }
+  game.battle = { e, energy: START_ATP, defending: false, log: [`A wild ${e.name} appears!`, 'Choose a move - then answer to power it.'], busy: false, turnN: 0, shake: 0, flash: null, charge: false, charmUsed: false, over: false, pops: [] };
+  if (e.boss !== undefined) game.battle.log = [`GUARDIAN BATTLE: ${e.name}!`, BOSSES[e.boss].lore];
+  game.state = 'battle'; game.streak = 0; held.clear(); joy.active = false;
+  updateTouchUI(); renderActions();
+  Sound.beep(300, 0.1); setTimeout(() => Sound.beep(450, 0.15), 100);
+}
+// Which questions can come up: mostly the creature's favourites, then its whole topic, plus review of older topics.
+function battlePool() {
+  const e = game.battle.e, roll = Math.random();
+  if (e.boss === undefined && roll < 0.55) return e.q;
+  if (roll < 0.85 || e.r === 0) return e.pool;
+  return QUESTIONS.filter((q) => q.t < e.r).map((q) => q.id);
+}
+function renderActions() {
+  const b = game.battle, box = $('actions');
+  if (!b || b.over || game.state !== 'battle') { box.style.display = 'none'; return; }
+  box.style.display = 'grid';
+  box.innerHTML = ACTIONS.map((a) => {
+    let dis = b.busy;
+    if (b.energy < a.cost) dis = true;   // can't afford it
+    if ((a.id === 'befriend' || a.id === 'flee') && b.e.boss !== undefined) dis = true;
+    return `<button class="act" data-a="${a.id}" ${dis ? 'disabled' : ''}><span class="num">${a.key}</span>${a.label} <b class="cost">${a.cost} ATP</b><small>${a.desc}</small></button>`;
+  }).join('');
+  box.querySelectorAll('.act').forEach((btn) => btn.addEventListener('click', () => chooseAction(btn.dataset.a)));
+}
+function chooseAction(id) {
+  const b = game.battle; if (!b || b.busy || b.over || game.curQ) return;
+  const btn = $('actions').querySelector(`[data-a="${id}"]`); if (!btn || btn.disabled) return;
+  b.busy = true; renderActions();
+  askQuestion(battlePool(), ACTIONS.find((a) => a.id === id).label, (correct) => resolveAction(id, correct));
+}
+// Floating damage/heal number over 'e' (enemy) or 'p' (player). Rises and fades over 1 second.
+function popNum(who, text, color) { const b = game.battle; b.pops.push({ who, text, color, t: 1 }); b.popCount = (b.popCount || 0) + 1; }
+function blog(msg) { const b = game.battle; b.log.push(msg); if (b.log.length > 4) b.log.shift(); }
+function streakMult() { return 1 + 0.25 * Math.min(Math.max(game.streak - 1, 0), 4); }   // 2 in a row = x1.25 ... up to x2
+function resolveAction(id, correct) {
+  const b = game.battle, e = b.e, s = game.save;
+  // The ATP is spent whether you are right or wrong.
+  const cost = actionCost(id);
+  b.energy = Math.max(0, b.energy - cost);
+  if (!correct) {
+    // Wrong: the move does nothing and you lose your turn. No extra damage.
+    blog(`Wrong! Lost ${cost} ATP and your turn.`);
+    b.flash = { c: '#ff4d6d', t: 0.3 }; b.missFx = 1.2; popNum('e', 'MISS', '#cfd6ff');   // red flash + "TURN LOST" banner
+    return setTimeout(enemyTurn, 650);
+  }
+  const mult = streakMult();
+  if (id === 'attack' || id === 'special') {
+    const dmg = Math.round((atkPow() * (id === 'special' ? 2.4 : 1) + randInt(0, 4)) * mult);
+    e.hp = Math.max(0, e.hp - dmg); popNum('e', '-' + dmg, '#ff4d6d'); b.shake = 0.4; Sound.hit();
+    blog(`${id === 'special' ? 'ATP BURST' : 'Hit'} for ${dmg}!${mult > 1 ? ` (streak x${mult.toFixed(2)})` : ''}`);
+    burst(W * 0.72, H * 0.3, e.color, id === 'special' ? 40 : 18);
+  } else if (id === 'heal') {
+    let amt;
+    if (s.superPotions > 0 && s.hp < maxHp() - 60) { s.superPotions--; amt = 100; } else if (s.potions > 0) { s.potions--; amt = 40; } else amt = 18;
+    amt = Math.round((amt + compBonus('heal')) * (mult > 1 ? 1.2 : 1));
+    s.hp = Math.min(maxHp(), s.hp + amt); popNum('p', '+' + amt, '#80ed99'); blog(`Healed ${amt} HP.`);
+    burst(W * 0.28, H * 0.5, '#80ed99', 20);
+  } else if (id === 'defend') {
+    b.defending = true; popNum('p', 'SHIELD', '#8ecae6'); blog('You raise your membrane shield!');
+  } else if (id === 'befriend') {
+    const chance = e.hp / e.maxHp <= 0.5 ? 1 : 0.3 + 0.1 * game.streak;
+    if (Math.random() < chance) { blog(`${e.name} wants to join you!`); return setTimeout(() => endBattle('friend'), 700); }
+    blog(`${e.name} is curious but not convinced. Weaken it first!`);
+  } else if (id === 'flee') { blog('You slipped away!'); return setTimeout(() => endBattle('flee'), 500); }
+  if (e.hp <= 0) return setTimeout(() => endBattle('win'), 700);
+  setTimeout(enemyTurn, 650);
+}
+function enemyTurn() {
+  const b = game.battle; if (!b || b.over) return;
+  const e = b.e, s = game.save;
+  b.turnN++;
+  // Guardians charge a big attack every 3rd turn - a perfect time to Defend!
+  let power = Math.round(e.atk * ENEMY_POWER);
+  if (e.boss !== undefined) {
+    if (b.charge) { power = Math.round(e.atk * ENEMY_POWER * 2.2); b.charge = false; blog(`${e.name} unleashes its charged attack!`); }
+    else if (b.turnN % 3 === 0) { b.charge = true; blog(`${e.name} is charging up... DEFEND next turn!`); return finishEnemy(); }
+  }
+  let dmg = Math.max(1, Math.round(power + randInt(-2, 3) - defPow()));
+  if (b.defending) dmg = Math.ceil(dmg / 2);
+  b.defending = false;
+  s.hp = Math.max(0, s.hp - dmg); popNum('p', '-' + dmg, '#ff4d6d'); Sound.hit();
+  b.flash = { c: '#ff4d6d', t: 0.25 };
+  blog(`${e.name} hits you for ${dmg}.`);
+  if (s.hp <= 0) return setTimeout(() => endBattle('lose'), 700);
+  finishEnemy();
+}
+// Back to the player: regain a little ATP, then pick a move.
+function finishEnemy() { const b = game.battle; b.energy = Math.min(MAX_ATP, b.energy + ATP_REGEN); b.busy = false; renderActions(); }
+function endBattle(result) {
+  const b = game.battle, e = b.e, s = game.save;
+  b.over = true; renderActions();
+  const lines = [];
+  if (result === 'win' || result === 'friend') {
+    const xp = 10 + e.lvl * 4 + (e.boss !== undefined ? 60 : 0);
+    const coins = 6 + e.lvl * 2 + game.streak * 2 + (e.boss !== undefined ? 80 : 0);
+    s.xp += xp; s.coins += coins; s.wins[e.r]++;
+    lines.push(result === 'friend' ? `${e.name} joined your party!` : `You defeated ${e.name}!`, `+${xp} XP, +${coins} glucose.`);
+    if (result === 'friend') { s.friends[e.r]++; if (!s.party.includes(e.key)) s.party.push(e.key); if (!s.companion) s.companion = e.key; }
+    while (s.xp >= xpNeed()) { s.xp -= xpNeed(); s.lvl++; s.hp = maxHp(); lines.push(`LEVEL UP! You are now level ${s.lvl}.`); }
+    if (e.boss !== undefined) {
+      s.bosses[e.boss] = true;
+      if (e.boss < 4) lines.push(`The membrane gate to ${REGIONS[e.boss + 1].name} is now OPEN!`);
+      else lines.push('ATP SYNTHASE spins freely - the cell is making ATP again! Visit the Nucleus Hologram nearby.');
+    }
+    if (e.ent) { e.ent.alive = false; e.ent.respawn = 25; }
+  } else if (result === 'lose') {
+    const cp = s.checkpoint || { x: 5 * TILE, y: 17 * TILE };
+    s.hp = Math.ceil(maxHp() / 2); s.coins = Math.floor(s.coins * 0.8); s.x = cp.x; s.y = cp.y;
+    lines.push('You fainted! A chaperone protein carried you back to safety.', 'Tip: open the Codex to review what you missed.');
+  } else {
+    if (e.ent) e.ent.cool = 4;
+    lines.push('You got away.');
+  }
+  saveGame();
+  setTimeout(() => { game.state = 'play'; game.battle = null; game.invuln = 1.5; dialog('Battle over', lines); }, 300);
+}
+
+// =====================================================================
+// 13. ENDING
+// =====================================================================
+function showEnding() {
+  game.save.ended = true; saveGame(); game.state = 'end';
+  burst(W / 2, H / 2, '#ffd166', 80); burst(W / 2, H / 2, '#7ff0de', 80);
+  openPanel(`<div class="dlg end"><div class="who">THE CELL IS RESTORED!</div><div class="say">You mastered all 30 questions about ATP and cellular respiration.<br><br>` +
+    `C<sub>6</sub>H<sub>12</sub>O<sub>6</sub> + 6 O<sub>2</sub> &rarr; 6 CO<sub>2</sub> + 6 H<sub>2</sub>O + ~30-32 ATP. The ATP cycle spins again, the pumps pump, and the muscles move.<br><br>` +
+    `Level ${game.save.lvl} &middot; ${game.save.party.length} creatures befriended &middot; best streak ${game.save.bestStreak}.<br><br><b>Thanks for playing Cell Quest!</b></div>` +
+    `<button class="choice submit" id="endok">Keep exploring</button></div>`, 'end');
+  $('endok').addEventListener('click', () => { game.state = 'play'; closePanel(); });
+}
+
+
+// =====================================================================
+// 14. INPUT - keyboard (e.code with e.key fallback), mouse, and touch
+// =====================================================================
+const KEYMAP = {
+  KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  KeyE: 'interact', Space: 'interact', Enter: 'confirm', NumpadEnter: 'confirm', KeyC: 'codex', KeyJ: 'codex', Escape: 'back', KeyM: 'mute',
+  Digit1: 'n1', Digit2: 'n2', Digit3: 'n3', Digit4: 'n4', Digit5: 'n5', Digit6: 'n6',
+  Numpad1: 'n1', Numpad2: 'n2', Numpad3: 'n3', Numpad4: 'n4', Numpad5: 'n5', Numpad6: 'n6',
+};
+// Some keyboards / remote desktops send no e.code, so we also understand e.key (lowercased, so Caps Lock is fine).
+const KEYMAP_BY_KEY = { w: 'up', s: 'down', a: 'left', d: 'right', arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right', e: 'interact', ' ': 'interact', enter: 'confirm', c: 'codex', j: 'codex', escape: 'back', m: 'mute', 1: 'n1', 2: 'n2', 3: 'n3', 4: 'n4', 5: 'n5', 6: 'n6' };
+function keyAction(e) { return KEYMAP[e.code] || KEYMAP_BY_KEY[String(e.key || '').toLowerCase()]; }
+const held = new Set();
+window.addEventListener('keydown', (e) => {
+  Sound.unlock();
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;   // let him type fill-in answers
+  if (game.touchMode) { game.touchMode = false; updateTouchUI(); }          // a keyboard is in use: hide phone buttons
+  const a = keyAction(e); if (!a) return;
+  e.preventDefault();
+  held.add(a);
+  if (!e.repeat) onPress(a);
+});
+window.addEventListener('keyup', (e) => { const a = keyAction(e); if (a) held.delete(a); });
+window.addEventListener('blur', () => { held.clear(); joy.active = false; });   // alt-tab: let go of every key
+// Focus fix: we cancel the browser's default click behaviour (preventDefault), which also stops
+// the page getting keyboard focus inside some preview windows. So we grab focus ourselves.
+function grabFocus() { try { window.focus(); canvas.focus({ preventScroll: true }); } catch (e) { /* not important */ } }
+window.addEventListener('load', grabFocus);
+
+function onPress(a) {
+  if (a === 'mute') { Sound.muted = !Sound.muted; toast(Sound.muted ? 'Sound off' : 'Sound on'); return; }
+  // 1) A question is open: number keys pick an answer, Enter continues
+  if (game.curQ) {
+    if (game.curQ.answered) { if (a === 'confirm' || a === 'interact') closeQuestion(); return; }
+    if (a[0] === 'n') submitChoice(+a[1] - 1);
+    return;
+  }
+  // 2) A panel is open
+  if (game.panel) {
+    if (game.panel === 'dialog' && (a === 'interact' || a === 'confirm')) { const b = $('dnext'); if (b) b.click(); }
+    else if (game.panel === 'end' && (a === 'interact' || a === 'confirm')) $('endok').click();
+    else if (a === 'back' || (a === 'codex' && game.panel === 'codex')) closePanel();
+    return;
+  }
+  if (game.state === 'title') { if (a === 'interact' || a === 'confirm') startGame(); return; }
+  if (game.state === 'battle') { if (a[0] === 'n') { const act = ACTIONS[+a[1] - 1]; if (act) chooseAction(act.id); } return; }
+  if (game.state === 'play') {
+    if (a === 'interact' || a === 'confirm') tryInteract();
+    if (a === 'codex') openCodex();
+  }
+}
+// Touch joystick: drag anywhere on the left part of the screen. Buttons only appear after a REAL touch,
+// because many Windows laptops say they "support touch" even when you use a mouse.
+const joy = { active: false, id: null, sx: 0, sy: 0, x: 0, y: 0 };
+window.addEventListener('touchstart', () => { if (!game.touchMode) { game.touchMode = true; updateTouchUI(); } }, { passive: true });
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); grabFocus(); Sound.unlock();
+  if (e.pointerType === 'touch' || e.pointerType === 'pen') { if (!game.touchMode) { game.touchMode = true; updateTouchUI(); } }
+  if (game.state !== 'play' || game.panel) return;
+  if (game.touchMode && e.clientX < W * 0.6) {
+    joy.active = true; joy.id = e.pointerId; joy.sx = joy.x = e.clientX; joy.sy = joy.y = e.clientY;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* not important */ }
+  } else {
+    // Mouse/tap: click an NPC that is close to you to talk
+    const wx = e.clientX + game.cam.x, wy = e.clientY + game.cam.y;
+    const n = game.npcs.find((n) => Math.hypot(n.x - wx, n.y - wy) < 30);
+    if (n && Math.hypot(n.x - game.save.x, n.y - game.save.y) < 110) talkTo(n);
+  }
+});
+canvas.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
+const endJoy = (e) => { if (e.pointerId === joy.id) joy.active = false; };
+canvas.addEventListener('pointerup', endJoy); canvas.addEventListener('pointercancel', endJoy);
+function updateTouchUI() { $('touchbtns').style.display = game.touchMode && game.state === 'play' && !game.panel ? 'flex' : 'none'; }
+$('tb-a').addEventListener('click', () => { if (!game.panel && game.state === 'play') tryInteract(); });
+$('tb-c').addEventListener('click', () => { if (!game.panel && game.state === 'play') openCodex(); });
+$('hud-codex').addEventListener('click', () => { if (game.state === 'play' && !game.panel) openCodex(); grabFocus(); });
+$('hud-mute').addEventListener('click', () => { onPress('mute'); grabFocus(); });
+
+function moveInput() {
+  let x = (held.has('right') ? 1 : 0) - (held.has('left') ? 1 : 0), y = (held.has('down') ? 1 : 0) - (held.has('up') ? 1 : 0);
+  if (joy.active) { const dx = joy.x - joy.sx, dy = joy.y - joy.sy, m = Math.hypot(dx, dy); if (m > 8) { x = dx / Math.max(m, 50); y = dy / Math.max(m, 50); } }
+  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+  return { x, y };
+}
+function nearestNpc() {
+  let best = null, bd = 62;
+  for (const n of game.npcs) { const d = Math.hypot(n.x - game.save.x, n.y - game.save.y); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+function tryInteract() { const n = nearestNpc(); if (n) talkTo(n); }
+
+// =====================================================================
+// 15. START + UPDATE
+// =====================================================================
+function startGame(fresh) {
+  const loaded = !fresh && loadGame();
+  game.save = loaded || newSave();
+  game.state = 'play'; $('title').style.display = 'none'; $('hud').style.display = 'flex';
+  buildNpcs(); spawnCreatures(); game.lastRegion = -1;
+  updateTouchUI(); grabFocus();
+  if (!loaded) {
+    saveGame();
+    dialog('Professor Ribo', ['Welcome, Explorer! You have been shrunk down and sent INSIDE a cell.', 'The cell is running out of ATP - its energy currency. Five regions, five guardians, and one giant turbine: ATP SYNTHASE.', 'In battle, EVERY move needs a correct answer. Right = the move works (streaks hit harder!). Wrong = you lose the ATP the move cost AND your turn (you still see the answer so you learn it).', 'Move: WASD / arrow keys (or drag on a phone). Talk: E or Space. Codex: C. In battle, press 1-6 or tap the buttons. Come talk to me first - I have quests!']);
+  } else toast('Welcome back! Progress loaded.');
+}
+function update(dt) {
+  game.time += dt;
+  if (game.toastT > 0) game.toastT -= dt;
+  game.particles = game.particles.filter((p) => (p.t -= dt) > 0);
+  game.particles.forEach((p) => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 200 * dt; });
+  if (game.battle) { game.battle.pops = game.battle.pops.filter((q) => (q.t -= dt) > 0); if (game.battle.missFx > 0) game.battle.missFx -= dt; if (game.battle.shake > 0) game.battle.shake -= dt; if (game.battle.flash && (game.battle.flash.t -= dt) <= 0) game.battle.flash = null; }
+  if (game.state !== 'play') return;
+  const s = game.save;
+  game.cam.x = clamp(s.x - W / 2, 0, Math.max(0, MAP_W * TILE - W)); game.cam.y = clamp(s.y - H / 2, 0, Math.max(0, MAP_H * TILE - H));
+  if (MAP_H * TILE < H) game.cam.y = (MAP_H * TILE - H) / 2;
+  if (game.panel) return;
+  // Player movement with tile collision (x and y separately so you slide along walls)
+  const m = moveInput(), speed = s.gear.boots ? 230 : 170, R = 10;
+  const free = (nx, ny) => !(solid(Math.floor((nx - R) / TILE), Math.floor((ny - R) / TILE)) || solid(Math.floor((nx + R) / TILE), Math.floor((ny - R) / TILE)) ||
+    solid(Math.floor((nx - R) / TILE), Math.floor((ny + R) / TILE)) || solid(Math.floor((nx + R) / TILE), Math.floor((ny + R) / TILE)));
+  const nx = s.x + m.x * speed * dt, ny = s.y + m.y * speed * dt;
+  if (free(nx, s.y)) s.x = nx;
+  if (free(s.x, ny)) s.y = ny;
+  game.moving = !!(m.x || m.y);
+  if (game.moving) { game.walkAnim += dt * 10; if (m.x) game.face = m.x < 0 ? -1 : 1; }
+  // Entering a new region shows its name
+  const r = regionOf(s.x);
+  if (r !== game.lastRegion) { game.lastRegion = r; toast(REGIONS[r].name + ': ' + REGIONS[r].desc); }
+  if (game.invuln > 0) game.invuln -= dt;
+  // Creatures wander near home and chase you if you get close
+  for (const c of game.creatures) {
+    if (!c.alive) { if ((c.respawn -= dt) <= 0) { c.alive = true; c.x = c.hx; c.y = c.hy; } continue; }
+    if (c.cool > 0) c.cool -= dt;
+    c.t -= dt;
+    const d = Math.hypot(s.x - c.x, s.y - c.y);
+    if (d < 130 && d > 0 && !(c.cool > 0)) { c.vx = (s.x - c.x) / d * 60; c.vy = (s.y - c.y) / d * 60; }
+    else if (c.t <= 0) {
+      c.t = rand(1, 3); const a = rand(0, Math.PI * 2); c.vx = Math.cos(a) * 35; c.vy = Math.sin(a) * 35;
+      if (Math.hypot(c.x - c.hx, c.y - c.hy) > 120) { c.vx = (c.hx - c.x) / 4; c.vy = (c.hy - c.y) / 4; }
+    }
+    const cx = c.x + c.vx * dt, cy = c.y + c.vy * dt;
+    if (!solid(Math.floor(cx / TILE), Math.floor(cy / TILE)) && tileAt(Math.floor(cx / TILE), Math.floor(cy / TILE)) !== T.GATE && regionOf(cx) === c.r) { c.x = cx; c.y = cy; } else { c.vx *= -1; c.vy *= -1; }
+    if (d < 26 && !(game.invuln > 0) && !(c.cool > 0)) { startBattle({ c }); return; }
+  }
+  game.saveT = (game.saveT || 0) + dt; if (game.saveT > 10) { game.saveT = 0; saveGame(); }   // autosave
+}
+function burst(x, y, color, n) { for (let i = 0; i < n; i++) game.particles.push({ x, y, vx: rand(-160, 160), vy: rand(-220, 40), t: rand(0.4, 0.9), c: color }); }
+
+// =====================================================================
+// 16. DRAWING (everything is drawn with code - no image files)
+// =====================================================================
+function drawCreature(c, x, y, scale, color, shape, t) {
+  c.save(); c.translate(x, y); c.scale(scale, scale);
+  const bob = Math.sin(t * 4) * 3;
+  c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.ellipse(0, 26, 22, 6, 0, 0, Math.PI * 2); c.fill();
+  c.translate(0, bob);
+  c.fillStyle = color; c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 3;
+  c.beginPath();
+  if (shape === 'ring') { for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 - Math.PI / 2; c.lineTo(Math.cos(a) * 25, Math.sin(a) * 23); } c.closePath(); }
+  else if (shape === 'spiky') { for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2 + t, rr = i % 2 ? 17 : 26; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); }
+  else if (shape === 'drop') { c.moveTo(0, -30); c.quadraticCurveTo(26, 0, 18, 14); c.arc(0, 8, 19, 0.3, Math.PI - 0.3); c.quadraticCurveTo(-26, 0, 0, -30); }
+  else if (shape === 'walker') {
+    c.ellipse(0, -4, 23, 17, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.lineWidth = 5; c.strokeStyle = color; c.moveTo(-10, 10); c.lineTo(-16 + Math.sin(t * 8) * 7, 26); c.moveTo(10, 10); c.lineTo(16 - Math.sin(t * 8) * 7, 26); c.stroke();
+    c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,0.45)'; c.beginPath(); c.ellipse(0, -4, 23, 17, 0, 0, Math.PI * 2);
+  }
+  else if (shape === 'boss') {
+    // body plus three phosphate "tails" that wiggle
+    for (let i = 0; i < 3; i++) { const tx = 30 + i * 12 + Math.sin(t * 3 + i) * 4, ty = -18 + i * 16; c.moveTo(tx + 10, ty); c.arc(tx, ty, 10, 0, Math.PI * 2); }
+    c.fill(); c.stroke(); c.beginPath(); c.arc(0, 0, 28, 0, Math.PI * 2);
+    c.fill(); c.stroke(); c.beginPath(); c.fillStyle = '#ffe28a'; c.moveTo(-18, -24); c.lineTo(-10, -40); c.lineTo(-4, -26); c.lineTo(4, -42); c.lineTo(10, -26); c.lineTo(18, -40); c.lineTo(20, -22); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.fillStyle = color; c.arc(0, 0, 0.1, 0, 1);
+  }
+  else if (shape === 'synthase') {
+    // ATP synthase: a membrane disk, a stalk, and a head that spins
+    c.fillStyle = '#ffcf56'; c.ellipse(0, 28, 38, 10, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.fillStyle = '#c44'; c.rect(-6, -18, 12, 44); c.fill(); c.stroke();
+    c.beginPath(); c.fillStyle = color;
+    for (let i = 0; i < 6; i++) { const a = t * 3 + i / 6 * Math.PI * 2, px = Math.cos(a) * 22, py = -34 + Math.sin(a) * 8; c.moveTo(px + 11, py); c.arc(px, py, 11, 0, Math.PI * 2); }
+    c.fill(); c.stroke(); c.beginPath(); c.arc(0, 0, 0.1, 0, 1);
+  }
+  else { c.ellipse(0, 0, 25, 21, 0, 0, Math.PI * 2); }
+  c.fill(); c.stroke();
+  // shine + eyes
+  const ey = shape === 'synthase' ? -34 : -2;
+  c.fillStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.ellipse(-8, ey - 9, 7, 4, -0.5, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(-8, ey, 6, 0, Math.PI * 2); c.arc(8, ey, 6, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#111'; c.beginPath(); c.arc(-7, ey + 1, 3, 0, Math.PI * 2); c.arc(9, ey + 1, 3, 0, Math.PI * 2); c.fill();
+  if (shape === 'boss' || shape === 'synthase') { c.strokeStyle = '#111'; c.lineWidth = 3; c.beginPath(); c.moveTo(-14, ey - 9); c.lineTo(-3, ey - 5); c.moveTo(14, ey - 9); c.lineTo(3, ey - 5); c.stroke(); }
+  c.restore();
+}
+function drawPlayer(c, x, y, scale, t, moving) {
+  c.save(); c.translate(x, y); c.scale(scale * (game.face || 1), scale);
+  const step = moving ? Math.sin(t) * 3 : 0;
+  c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(0, 16, 12, 4, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#334'; c.fillRect(-7, 6 + step, 5, 10); c.fillRect(2, 6 - step, 5, 10);              // legs
+  c.fillStyle = '#ffb703'; c.fillRect(-10, -8, 20, 17);                                               // suit
+  c.fillStyle = '#fb8500'; c.fillRect(-10, 2, 20, 3);
+  c.fillStyle = '#5c677d'; c.fillRect(-14, -6, 5, 12);                                                // backpack
+  c.fillStyle = '#bde0fe'; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(0, -15, 10, 0, Math.PI * 2); c.fill(); c.stroke(); // helmet
+  c.fillStyle = '#f1c27d'; c.beginPath(); c.arc(2, -15, 6, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#222'; c.fillRect(3, -17, 2, 2); c.fillRect(6, -17, 2, 2);
+  c.strokeStyle = '#ffd166'; c.beginPath(); c.moveTo(-4, -25); c.lineTo(-7, -32); c.stroke(); c.fillStyle = '#ff4d6d'; c.beginPath(); c.arc(-7, -32, 2.5, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+function drawNpc(n, x, y) {
+  const t = game.time;
+  if (n.type === 'boss') drawCreature(ctx, x, y - 8, 0.9, game.save.bosses[n.r] ? '#777' : n.look, BOSSES[n.r].shape, t);
+  else {
+    ctx.save(); ctx.translate(x, y + Math.sin(t * 2 + x) * 1.5);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 15, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = n.look; ctx.beginPath(); ctx.moveTo(-12, 14); ctx.lineTo(12, 14); ctx.lineTo(7, -6); ctx.lineTo(-7, -6); ctx.closePath(); ctx.fill();   // robe
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(0, -12, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.fillRect(-4, -14, 2, 2); ctx.fillRect(2, -14, 2, 2);
+    if (n.type === 'healer') { ctx.fillStyle = '#e63946'; ctx.fillRect(-2, -2, 4, 10); ctx.fillRect(-5, 1, 10, 4); }
+    if (n.type === 'shop') { ctx.fillStyle = '#6a4c93'; ctx.fillRect(-10, -23, 20, 5); ctx.fillRect(-6, -28, 12, 6); }
+    if (n.type === 'guide') { ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.strokeRect(-6, -15, 5, 4); ctx.strokeRect(1, -15, 5, 4); }
+    if (n.type === 'core') { ctx.strokeStyle = '#7ff0de'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -2, 20 + Math.sin(t * 3) * 3, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.restore();
+  }
+  const icon = { guide: '!', healer: '+', shop: '$', boss: game.save.bosses[n.r] ? '' : '!!', lore: '?', core: '*' }[n.type];
+  const ready = n.type === 'guide' && QUESTS.some((q) => q.r === n.r && (!game.save.quests[q.id] || (game.save.quests[q.id] === 'active' && q.need(game.save))));
+  if (icon) { ctx.fillStyle = ready || n.type === 'boss' ? '#ffd166' : 'rgba(255,255,255,0.85)'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(icon, x, y - (n.type === 'boss' ? 46 : 30) + Math.sin(t * 4) * 2); }
+}
+function drawWorld() {
+  const cam = game.cam, t = game.time;
+  const x0 = Math.max(0, Math.floor(cam.x / TILE)), x1 = Math.min(MAP_W - 1, Math.ceil((cam.x + W) / TILE));
+  const y0 = Math.max(0, Math.floor(cam.y / TILE)), y1 = Math.min(MAP_H - 1, Math.ceil((cam.y + H) / TILE));
+  ctx.fillStyle = '#0b0f1a'; ctx.fillRect(0, 0, W, H);
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    const reg = REGIONS[Math.min(NREG - 1, Math.floor(tx / REG_W))];
+    const sx = tx * TILE - cam.x, sy = ty * TILE - cam.y, tile = map[ty][tx];
+    const h = Math.abs((tx * 73856093) ^ (ty * 19349663));     // a fixed "random" number for each tile
+    ctx.fillStyle = (h & 1) ? reg.floor : reg.floor2; ctx.fillRect(sx, sy, TILE + 1, TILE + 1);
+    if (tile === T.PATH) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(sx, sy, TILE + 1, TILE + 1); }
+    if ((h & 15) === 3 && tile !== T.ORG) { ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.beginPath(); ctx.arc(sx + (h >> 4 & 31), sy + (h >> 9 & 31) + Math.sin(t + h) * 2, 2, 0, Math.PI * 2); ctx.fill(); }
+    if (tile === T.ORG) {
+      ctx.fillStyle = reg.org; ctx.beginPath(); ctx.arc(sx + 16, sy + 16, 17, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.arc(sx + 11, sy + 11, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(sx + 20, sy + 21, 4, 0, Math.PI * 2); ctx.fill();
+    } else if (tile === T.POOL) {
+      ctx.fillStyle = 'rgba(80,200,255,0.35)'; ctx.fillRect(sx, sy, TILE + 1, TILE + 1);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sx + 16, sy + 16, 2 + (t * 8 + h % 10) % 12, 0, Math.PI * 2); ctx.stroke();
+    } else if (tile === T.MEMB) {
+      // phospholipid bilayer: heads on both sides, tails in the middle
+      ctx.fillStyle = '#2a1f3d'; ctx.fillRect(sx, sy, TILE + 1, TILE + 1);
+      ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 2; i++) { ctx.moveTo(sx + 8 + i * 16, sy + 10); ctx.lineTo(sx + 8 + i * 16, sy + 22); } ctx.stroke();
+      ctx.fillStyle = '#ffcf56'; ctx.beginPath(); for (let i = 0; i < 2; i++) { ctx.moveTo(sx + 13 + i * 16, sy + 5); ctx.arc(sx + 8 + i * 16, sy + 5, 5, 0, Math.PI * 2); ctx.moveTo(sx + 13 + i * 16, sy + 27); ctx.arc(sx + 8 + i * 16, sy + 27, 5, 0, Math.PI * 2); } ctx.fill();
+    } else if (tile === T.GATE) {
+      const open = game.save.bosses[gateRegion(tx) - 1];
+      ctx.fillStyle = open ? 'rgba(128,237,153,0.25)' : 'rgba(255,77,109,' + (0.5 + Math.sin(t * 4) * 0.2) + ')';
+      ctx.fillRect(sx, sy, TILE + 1, TILE + 1);
+      if (!open) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(sx + 10, sy + 14, 12, 10); ctx.beginPath(); ctx.arc(sx + 16, sy + 14, 4, Math.PI, 0); ctx.stroke(); }
+    }
+  }
+  // Sort NPCs, creatures and the player by y so things in front overlap things behind
+  const things = [];
+  for (const n of game.npcs) things.push({ y: n.y, d: () => drawNpc(n, n.x - cam.x, n.y - cam.y) });
+  for (const c of game.creatures) if (c.alive && Math.abs(c.x - cam.x - W / 2) < W) things.push({ y: c.y, d: () => {
+    drawCreature(ctx, c.x - cam.x, c.y - cam.y, 0.55, SPECIES[c.sp].color, SPECIES[c.sp].shape, t + c.hx);
+    ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Lv' + c.lvl, c.x - cam.x, c.y - cam.y - 20);
+  } });
+  const s = game.save;
+  things.push({ y: s.y, d: () => {
+    if (s.companion && SPECIES[s.companion]) drawCreature(ctx, s.x - cam.x - 22 * game.face, s.y - cam.y + 4, 0.35, SPECIES[s.companion].color, SPECIES[s.companion].shape, t * 1.5);
+    if (!(game.invuln > 0) || Math.floor(t * 10) % 2) drawPlayer(ctx, s.x - cam.x, s.y - cam.y, 1, game.walkAnim, game.moving);
+  } });
+  things.sort((a, b) => a.y - b.y).forEach((o) => o.d());
+  const n = nearestNpc();
+  if (n && !game.panel) {
+    const label = (game.touchMode ? 'Tap A' : 'E') + ': talk to ' + n.name;
+    ctx.font = '12px sans-serif'; const w = ctx.measureText(label).width + 16;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(n.x - cam.x - w / 2, n.y - cam.y + 20, w, 20); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(label, n.x - cam.x, n.y - cam.y + 34);
+  }
+}
+function drawHud() {
+  const s = game.save;
+  ctx.fillStyle = 'rgba(10,14,28,0.82)'; ctx.fillRect(8, 8, 232, 104); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.strokeRect(8, 8, 232, 104);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(`Lv ${s.lvl}   ${s.coins} glucose   Potions ${s.potions}`, 16, 26);
+  bar(16, 34, 216, 11, s.hp / maxHp(), '#80ed99', `HP ${s.hp}/${maxHp()}`);
+  bar(16, 50, 216, 6, s.xp / xpNeed(), '#ffd166', '');
+  const m = totalMastery();
+  bar(16, 62, 216, 13, m, '#7ff0de', `MASTERY ${Math.round(m * 100)}%`);
+  const r = regionOf(s.x); const rn = r === 4 ? MITO_ZONES[mitoZone(Math.floor(s.x / TILE))] : REGIONS[r].name;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = '12px sans-serif'; ctx.fillText(rn, 16, 91, 216);
+  ctx.fillStyle = '#ffd166'; ctx.fillText(`Guardians ${s.bosses.filter(Boolean).length}/5  ·  Party ${s.party.length}`, 16, 106);
+  drawMinimap();
+  if (game.toastT > 0 && game.toast) {
+    ctx.globalAlpha = Math.min(1, game.toastT); ctx.font = 'bold 14px sans-serif'; const tw = Math.min(W - 20, ctx.measureText(game.toast).width + 24);
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(W / 2 - tw / 2, H - 130, tw, 30); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(game.toast, W / 2, H - 110, W - 34); ctx.globalAlpha = 1;
+  }
+  if (joy.active) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(joy.sx, joy.sy, 50, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(joy.sx + clamp(joy.x - joy.sx, -50, 50), joy.sy + clamp(joy.y - joy.sy, -50, 50), 20, 0, Math.PI * 2); ctx.fill();
+  }
+}
+function bar(x, y, w, h, f, color, label) {
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = color; ctx.fillRect(x, y, w * clamp(f, 0, 1), h);
+  if (label) { ctx.fillStyle = '#000'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(label, x + 4, y + h - 2); }
+}
+function drawMinimap() {
+  const mw = Math.min(240, W - 260 > 120 ? W - 260 : W * 0.38), sc = mw / MAP_W, mh = MAP_H * sc, x = W - mw - 10, y = W < 600 ? 120 : 10;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(x - 3, y - 3, mw + 6, mh + 6);
+  for (let r = 0; r < NREG; r++) { ctx.fillStyle = r === 0 || game.save.bosses[r - 1] ? REGIONS[r].org : '#333'; ctx.globalAlpha = 0.55; ctx.fillRect(x + r * REG_W * sc, y, REG_W * sc, mh); }
+  ctx.globalAlpha = 1;
+  for (let r = 1; r < NREG; r++) { ctx.fillStyle = game.save.bosses[r - 1] ? '#80ed99' : '#ff4d6d'; ctx.fillRect(x + r * REG_W * sc - 1, y + GATES[r].y * sc - 2, 3, 3 * sc + 4); }
+  for (const n of game.npcs) { ctx.fillStyle = n.type === 'boss' ? '#ff4d6d' : n.type === 'shop' ? '#ffd166' : n.type === 'healer' ? '#80ed99' : '#fff'; ctx.fillRect(x + n.x / TILE * sc - 1.5, y + n.y / TILE * sc - 1.5, 3, 3); }
+  ctx.fillStyle = '#00ff88'; ctx.beginPath(); ctx.arc(x + game.save.x / TILE * sc, y + game.save.y / TILE * sc, 3 + Math.sin(game.time * 6), 0, Math.PI * 2); ctx.fill();
+}
+function drawBattle() {
+  const b = game.battle, e = b.e, s = game.save, t = game.time;
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, REGIONS[e.r].floor2); g.addColorStop(1, '#05070d');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 30; i++) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.arc((i * 137 + t * 10 * (i % 3 + 1)) % W, (i * 89) % H, 3 + i % 5, 0, Math.PI * 2); ctx.fill(); }
+  const small = H < 700 || W < 600;
+  const ey = H * (small ? 0.27 : 0.3), py = H * (small ? 0.44 : 0.52);
+  const ex = W * 0.72 + (b.shake > 0 ? rand(-6, 6) : 0);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.ellipse(W * 0.72, ey + 45, 110, 24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(W * 0.28, py + 32, 90, 20, 0, 0, Math.PI * 2); ctx.fill();
+  drawCreature(ctx, ex, ey, (e.boss !== undefined ? 2.0 : 1.5) * (small ? 0.8 : 1), e.color, e.shape, t);
+  drawPlayer(ctx, W * 0.28, py, small ? 1.6 : 2.2, t * 4, false);
+  if (s.companion && SPECIES[s.companion]) drawCreature(ctx, W * 0.28 - 60, py + 20, 0.6, SPECIES[s.companion].color, SPECIES[s.companion].shape, t);
+  infoBox(10, 10, `${e.name}  Lv${e.lvl}`, e.hp, e.maxHp);
+  const lw = Math.min(W - 20, 430), ly = 62;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(10, ly, lw, 74);
+  ctx.fillStyle = '#fff'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
+  b.log.slice(-4).forEach((l, i) => ctx.fillText(l, 18, ly + 17 + i * 17, lw - 16));
+  infoBox(W - 230, py + 58, `You  Lv${s.lvl}`, s.hp, maxHp(), b.energy);
+  if (game.streak >= 2) { ctx.fillStyle = '#ffd166'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'right'; ctx.fillText(`STREAK x${game.streak} (dmg x${streakMult().toFixed(2)})`, W - 14, 28); }
+  // Floating numbers: start over the target, drift up 50px and fade out
+  b.pops.forEach((q, i) => {
+    const x = q.who === 'e' ? W * 0.72 : W * 0.28, y = (q.who === 'e' ? ey - 50 : py - 60) - (1 - q.t) * 50 - i * 4;
+    ctx.globalAlpha = Math.min(1, q.t * 1.5); ctx.font = `bold ${small ? 26 : 32}px sans-serif`; ctx.textAlign = 'center';
+    ctx.lineWidth = 5; ctx.strokeStyle = '#000'; ctx.strokeText(q.text, x, y); ctx.fillStyle = q.color; ctx.fillText(q.text, x, y);
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  });
+  // Big banner after a wrong answer
+  if (b.missFx > 0) { ctx.globalAlpha = Math.min(1, b.missFx); ctx.fillStyle = '#ff4d6d'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('WRONG - ATP LOST, TURN LOST', W / 2, H * 0.4); ctx.globalAlpha = 1; ctx.textAlign = 'left'; }
+  if (b.flash) { ctx.fillStyle = b.flash.c; ctx.globalAlpha = Math.max(0, b.flash.t); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+}
+function infoBox(x, y, name, hp, max, energy) {
+  ctx.fillStyle = 'rgba(10,14,28,0.85)'; ctx.fillRect(x, y, 220, energy !== undefined ? 56 : 44);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(name, x + 8, y + 17, 150);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(x + 8, y + 24, 204, 10);
+  ctx.fillStyle = hp / max > 0.5 ? '#80ed99' : hp / max > 0.25 ? '#ffd166' : '#ff4d6d'; ctx.fillRect(x + 8, y + 24, 204 * hp / max, 10);
+  ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.fillText(`${hp}/${max}`, x + 212, y + 17); ctx.textAlign = 'left';
+  // ATP bar: one yellow pip per ATP you have
+  if (energy !== undefined) { ctx.fillStyle = '#ffd166'; ctx.fillText(`ATP ${energy}/${MAX_ATP}`, x + 8, y + 50); for (let i = 0; i < MAX_ATP; i++) { ctx.fillStyle = i < energy ? '#ffd166' : 'rgba(255,255,255,0.15)'; ctx.fillRect(x + 72 + i * 14, y + 42, 11, 8); } }
+}
+function drawTitleBg() {
+  const t = game.time;
+  ctx.fillStyle = '#0b1020'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) { ctx.fillStyle = `hsla(${(i * 40) % 360},70%,60%,0.15)`; ctx.beginPath(); ctx.arc((i * 211 + t * 15) % (W + 100) - 50, (i * 97 + Math.sin(t + i) * 20 + H) % H, 10 + i % 25, 0, Math.PI * 2); ctx.fill(); }
+  drawCreature(ctx, W * 0.15, H * 0.82, 1.2, '#ffd166', 'blob', t); drawCreature(ctx, W * 0.85, H * 0.8, 1.4, '#ff4d6d', 'synthase', t);
+}
+function draw() {
+  // HUD buttons only on the map (they would cover the battle log)
+  const hudWant = game.state === 'play' ? 'flex' : 'none'; if (hudEl.style.display !== hudWant) hudEl.style.display = hudWant;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (game.state === 'title') drawTitleBg();
+  else if (game.state === 'battle' && game.battle) drawBattle();
+  else { drawWorld(); drawHud(); }
+  for (const p of game.particles) { ctx.fillStyle = p.c; ctx.globalAlpha = Math.min(1, p.t * 2); ctx.fillRect(p.x, p.y, 4, 4); }
+  ctx.globalAlpha = 1;
+}
+const hudEl = $('hud');
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+  try { update(dt); draw(); } catch (err) { showError(err); return; }
+  requestAnimationFrame(loop);
+}
+
+// ---------- 17. Boot ----------
+buildWorld();
+// Keep the starting spot clear so the player is never boxed in by an organelle on the first step.
+for (let y = 14; y <= 20; y++) for (let x = 2; x <= 10; x++) if (map[y][x] === T.ORG) map[y][x] = T.FLOOR;
+$('btn-continue').style.display = loadGame() ? 'block' : 'none';
+$('btn-new').addEventListener('click', (e) => { e.stopPropagation(); Sound.unlock(); if (loadGame() && !confirm('Start a new game? Your saved progress will be erased.')) return; try { localStorage.removeItem(SAVE_KEY); } catch (err) { /* ignore */ } startGame(true); });
+$('btn-continue').addEventListener('click', (e) => { e.stopPropagation(); Sound.unlock(); startGame(); });
+$('nojs').style.display = 'none';
+requestAnimationFrame(loop);
+// Handy for automated tests (and curious players in the browser console)
+window.CQ = { game, QUESTIONS, TOPICS, SPECIES, BOSSES, qStat, totalMastery, topicMastery, chooseAction, startBattle, saveGame, loadGame, checkFill, talkTo, GATES, TILE, REG_W, MASTER_BOX };
+
+</script>
+</body>
+</html>
