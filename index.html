@@ -500,6 +500,7 @@ function newSave() {
     quests: {},        // quests[id] = 'active' | 'done'
     turn: 0,           // counts every answer (spaced repetition uses it as a clock)
     bestStreak: 0, ended: false, checkpoint: null,
+    atp: 4,            // = START_ATP (literal: game2.js loads later). Battle ATP PERSISTS between fights (old saves without it get START_ATP via Object.assign)
   };
 }
 function saveGame() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(game.save)); } catch (e) { /* private mode */ } }
@@ -725,8 +726,8 @@ function talkTo(npc) {
     lines.push(`${TOPICS[npc.r].name} mastery: ${Math.round(topicMastery(npc.r) * 100)}%. The boss needs ${BOSS_MASTERY * 100}%.`);
     saveGame(); dialog(npc.name, lines);
   } else if (npc.type === 'healer') {
-    s.hp = maxHp(); s.checkpoint = { x: s.x, y: s.y }; saveGame();
-    dialog(npc.name, ['You are fully healed, and your progress is saved here.', 'Fun fact: chaperone proteins help other proteins fold - and many use ATP to do it!']);
+    s.hp = maxHp(); s.atp = Math.max(s.atp, START_ATP); s.checkpoint = { x: s.x, y: s.y }; saveGame();
+    dialog(npc.name, ['You are fully healed (ATP topped up to at least ' + START_ATP + '), and your progress is saved here.', 'Fun fact: chaperone proteins help other proteins fold - and many use ATP to do it!']);
   } else if (npc.type === 'shop') openShop();
   else if (npc.type === 'lore') dialog(npc.name, npc.lines);
   else if (npc.type === 'boss') {
@@ -820,13 +821,26 @@ function openCodex(tab) {
 // Every move costs ATP (battle energy). A WRONG answer still spends the ATP
 // and ends your turn - so think before you answer!
 const MAX_ATP = 10;    // most ATP you can hold
-const START_ATP = 4;   // ATP at the start of a battle (was 6)
+const START_ATP = 4;   // ATP for a brand-new game (was 6)
+// PERSISTENT ATP: your ATP is stored in save.atp and carries from one fight to the next.
+//  - End of any battle (win/befriend/flee): leftover ATP is kept and saved.
+//  - Fainting: ATP resets to START_ATP at the checkpoint.
+//  - Healers (chaperones): top ATP up to START_ATP if you're below it (never lowers it).
+//  - No soft-lock: if you enter a fight with 0 ATP you get your first-turn regen (+1)
+//    right away, so you can always afford Attack (cost 1).
 const ATP_REGEN = 1;   // ATP you regain each turn (was 2). Attack costs 1, so you can always attack.
 // Balance knobs (checked by tests/balance.js): ~65% right answers wins, guessing loses.
 // Damage is lowered on purpose so each fight lasts longer = more questions per fight.
 const PLAYER_POWER = 0.5;  // your Attack/Burst damage multiplier (was 1)
 const ENEMY_POWER = 0.75;  // enemy damage multiplier (was 1.6)
 const DEF_POWER = 0.3;     // how much of your armor/defense blocks each hit (was 1)
+// DEFEND (correct answer): refunds its 2 ATP AND adds DEFEND_BONUS extra ATP (net +2 before
+// regen, capped at MAX_ATP) - so Defend generates MORE energy than Attack (net 0).
+// The next enemy hit is reduced by DEFEND_BASE + defense stat x DEFEND_MULT (can drop to 0).
+// This replaces the old flat 'halve the hit' shield, so the defense stat clearly matters.
+const DEFEND_BONUS = 2;    // extra ATP from a correct Defend (on top of the refund)
+const DEFEND_BASE = 2;     // block even at 0 defense
+const DEFEND_MULT = 1;     // block per point of defense stat
 const CREATURE_HP = 1.6;   // wild creature HP multiplier (was 1.8)
 const BOSS_HP = 0.8;       // guardian HP multiplier (was 1)
 const HEAL_POWER = 0.6;    // heals and potions multiplier (was 1)
@@ -834,7 +848,7 @@ const ACTIONS = [
   { id: 'attack', label: 'Attack', key: 1, cost: 1, desc: 'Strike! Streaks hit harder.' },
   { id: 'special', label: 'ATP Burst', key: 2, cost: 5, desc: 'Huge hit.' },
   { id: 'heal', label: 'Heal', key: 3, cost: 3, desc: 'Drink a potion (or regenerate).' },
-  { id: 'defend', label: 'Defend', key: 4, cost: 2, desc: 'Halve the next hit.' },
+  { id: 'defend', label: 'Defend', key: 4, cost: 2, desc: 'Block by DEF, +2 ATP.' },
   { id: 'befriend', label: 'Befriend', key: 5, cost: 3, desc: 'Sure to work below 50% HP.' },
   { id: 'flee', label: 'Flee', key: 6, cost: 2, desc: 'Escape (not from bosses).' },
 ];
@@ -850,7 +864,7 @@ function startBattle(opt) {
     e = { name: sp.name, key: opt.c.sp, color: sp.color, shape: sp.shape, hp: Math.round((sp.hp + lv * 3) * CREATURE_HP), maxHp: Math.round((sp.hp + lv * 3) * CREATURE_HP), atk: sp.atk + Math.floor(lv / 2), q: sp.q, r: sp.r, lvl: lv, ent: opt.c,
       pool: QUESTIONS.filter((q) => q.t === sp.r).map((q) => q.id) };
   }
-  game.battle = { e, energy: START_ATP, defending: false, log: [`A wild ${e.name} appears!`, 'Choose a move - then answer to power it.'], busy: false, turnN: 0, shake: 0, flash: null, charge: false, charmUsed: false, over: false, pops: [] };
+  game.battle = { e, energy: Math.min(MAX_ATP, (game.save.atp || 0) < 1 ? (game.save.atp || 0) + ATP_REGEN : game.save.atp), defending: false, log: [`A wild ${e.name} appears!`, 'Choose a move - then answer to power it.'], busy: false, turnN: 0, shake: 0, flash: null, charge: false, charmUsed: false, over: false, pops: [] };
   if (e.boss !== undefined) game.battle.log = [`GUARDIAN BATTLE: ${e.name}!`, BOSSES[e.boss].lore];
   game.state = 'battle'; game.streak = 0; held.clear(); joy.active = false;
   updateTouchUI(); renderActions();
@@ -916,7 +930,13 @@ function resolveAction(id, correct) {
     s.hp = Math.min(maxHp(), s.hp + amt); popNum('p', '+' + amt, '#80ed99'); blog(`Healed ${amt} HP.`);
     burst(W * 0.28, H * 0.5, '#80ed99', 20);
   } else if (id === 'defend') {
-    b.defending = true; popNum('p', 'SHIELD', '#8ecae6'); blog('You raise your membrane shield!');
+    // Correct Defend: refund the cost + bonus ATP, and block the next hit by your defense.
+    b.defending = true;
+    const before = b.energy;
+    b.energy = Math.min(MAX_ATP, b.energy + cost + DEFEND_BONUS);
+    const gained = b.energy - before;
+    popNum('p', `+${gained} ATP (refund +${cost}, bonus +${DEFEND_BONUS})`, '#ffd166');
+    blog(`You raise your membrane shield! +${gained} ATP (refund +${cost}, bonus +${DEFEND_BONUS})`);
   } else if (id === 'befriend') {
     const chance = e.hp / e.maxHp <= 0.5 ? 1 : 0.3 + 0.1 * game.streak;
     if (Math.random() < chance) { blog(`${e.name} wants to join you!`); return setTimeout(() => endBattle('friend'), 700); }
@@ -936,7 +956,10 @@ function enemyTurn() {
     else if (b.turnN % 3 === 0) { b.charge = true; blog(`${e.name} is charging up... DEFEND next turn!`); return finishEnemy(); }
   }
   let dmg = Math.max(1, Math.round(power + randInt(-1, 1) - defPow() * DEF_POWER));
-  if (b.defending) dmg = Math.ceil(dmg / 2);
+  if (b.defending) {   // Defend block scales with your defense stat (see DEFEND_MULT)
+    const block = Math.min(dmg, Math.round(DEFEND_BASE + defPow() * DEFEND_MULT));
+    dmg -= block; popNum('p', 'Blocked ' + block, '#8ecae6'); blog(`Blocked ${block}!`);
+  }
   b.defending = false;
   s.hp = Math.max(0, s.hp - dmg); popNum('p', '-' + dmg, '#ff4d6d'); Sound.hit();
   b.flash = { c: '#ff4d6d', t: 0.25 };
@@ -949,6 +972,7 @@ function finishEnemy() { const b = game.battle; b.energy = Math.min(MAX_ATP, b.e
 function endBattle(result) {
   const b = game.battle, e = b.e, s = game.save;
   b.over = true; renderActions();
+  s.atp = b.energy;   // carry leftover ATP into the next fight (overridden below on a faint)
   const lines = [];
   if (result === 'win' || result === 'friend') {
     const xp = 10 + e.lvl * 4 + (e.boss !== undefined ? 60 : 0);
@@ -965,7 +989,7 @@ function endBattle(result) {
     if (e.ent) { e.ent.alive = false; e.ent.respawn = 25; }
   } else if (result === 'lose') {
     const cp = s.checkpoint || { x: 5 * TILE, y: 17 * TILE };
-    s.hp = Math.ceil(maxHp() / 2); s.coins = Math.floor(s.coins * 0.8); s.x = cp.x; s.y = cp.y;
+    s.hp = Math.ceil(maxHp() / 2); s.atp = START_ATP; s.coins = Math.floor(s.coins * 0.8); s.x = cp.x; s.y = cp.y;
     lines.push('You fainted! A chaperone protein carried you back to safety.', 'Tip: open the Codex to review what you missed.');
   } else {
     if (e.ent) e.ent.cool = 4;
@@ -1092,7 +1116,7 @@ function startGame(fresh) {
   updateTouchUI(); grabFocus();
   if (!loaded) {
     saveGame();
-    dialog('Professor Ribo', ['Welcome, Explorer! You have been shrunk down and sent INSIDE a cell.', 'The cell is running out of ATP - its energy currency. Five regions, five guardians, and one giant turbine: ATP SYNTHASE.', 'In battle, EVERY move needs a correct answer. Right = the move works (streaks hit harder!). Wrong = you lose the ATP the move cost AND your turn (you still see the answer so you learn it). Tip: a CORRECT basic Attack refunds its 1 ATP, so it never drains your energy!', 'Move: WASD / arrow keys (or drag on a phone). Talk: E or Space. Codex: C. In battle, press 1-6 or tap the buttons. Come talk to me first - I have quests!']);
+    dialog('Professor Ribo', ['Welcome, Explorer! You have been shrunk down and sent INSIDE a cell.', 'The cell is running out of ATP - its energy currency. Five regions, five guardians, and one giant turbine: ATP SYNTHASE.', 'In battle, EVERY move needs a correct answer. Right = the move works (streaks hit harder!). Wrong = you lose the ATP the move cost AND your turn (you still see the answer so you learn it). Tip: a CORRECT basic Attack refunds its 1 ATP, so it never drains your energy! A CORRECT Defend refunds its 2 ATP PLUS +2 bonus ATP, and blocks the next hit based on your defense stat - better armor = bigger blocks! Your ATP carries over between fights, so end battles with energy to spare.', 'Move: WASD / arrow keys (or drag on a phone). Talk: E or Space. Codex: C. In battle, press 1-6 or tap the buttons. Come talk to me first - I have quests!']);
   } else toast('Welcome back! Progress loaded.');
 }
 function update(dt) {
@@ -1375,7 +1399,7 @@ $('btn-continue').addEventListener('click', (e) => { e.stopPropagation(); Sound.
 $('nojs').style.display = 'none';
 requestAnimationFrame(loop);
 // Handy for automated tests (and curious players in the browser console)
-window.CQ = { game, resolveAction, QUESTIONS, TOPICS, SPECIES, BOSSES, qStat, totalMastery, topicMastery, chooseAction, startBattle, saveGame, loadGame, checkFill, talkTo, GATES, TILE, REG_W, MASTER_BOX };
+window.CQ = { game, resolveAction, enemyTurn, endBattle, QUESTIONS, TOPICS, SPECIES, BOSSES, qStat, totalMastery, topicMastery, chooseAction, startBattle, saveGame, loadGame, checkFill, talkTo, GATES, TILE, REG_W, MASTER_BOX };
 
 </script>
 </body>
